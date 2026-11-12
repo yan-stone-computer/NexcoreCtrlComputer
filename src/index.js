@@ -466,7 +466,16 @@ export class Computer {
     this._ensureOpen();
     const surface = this._surface(input);
     const delta = input.delta !== false;
-    const key = `${surface}:${this.config.session}:${input.app || input.url || input.root || "active"}`;
+    const key = [
+      surface,
+      this.config.session,
+      input.app || input.url || input.root || "active",
+      input.query || "",
+      input.selector || "",
+      input.depth || "",
+      input.maxNodes || "",
+      input.interactiveOnly !== false
+    ].join(":");
     let result;
 
     if (surface === "desktop") {
@@ -680,7 +689,7 @@ export class Computer {
         response = await this._browser(browserMap[action], { headed: input.headed });
       } else if (action === "fill" || action === "type") {
         const value = input.text ?? input.value ?? "";
-        response = await this._browser([action, ref, value], { headed: input.headed });
+        response = await this._browser([action, ref, "--", value], { headed: input.headed });
       } else if (action === "press") {
         if (!input.keys) throw new NexcoreError("KEYS_REQUIRED", "press needs keys.", { retry: "safe" });
         response = await this._browser(["press", input.keys], { headed: input.headed });

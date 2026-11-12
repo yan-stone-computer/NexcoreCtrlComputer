@@ -184,11 +184,20 @@ async function handle(message) {
 }
 
 const lines = createInterface({ input: process.stdin, crlfDelay: Infinity });
+let queue = Promise.resolve();
 lines.on("line", (line) => {
   if (!line.trim()) return;
+  let message;
   try {
-    handle(JSON.parse(line));
+    message = JSON.parse(line);
   } catch (error) {
     send({ jsonrpc: "2.0", id: null, error: { code: -32700, message: error.message } });
+    return;
   }
+  queue = queue
+    .then(() => handle(message))
+    .catch((error) => send({ jsonrpc: "2.0", id: message.id ?? null, error: { code: -32603, message: error.message } }));
+});
+lines.on("close", () => {
+  queue.finally(() => computer.close()).finally(() => process.exit(0));
 });
