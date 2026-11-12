@@ -31,24 +31,22 @@
 ## 三步跑起来
 
 ```bash
-git clone https://github.com/yan-stone-computer/NexcoreCtrlComputer.git
-cd NexcoreCtrlComputer
-npm install
-npm install agent-desktop agent-browser
-python -m pip install -r requirements-coordinate.txt   # 可选兜底
-node src/cli.js doctor
+npm install -g github:yan-stone-computer/NexcoreCtrlComputer
+npm install -g agent-desktop agent-browser
+python -m pip install pyautogui                         # 可选兜底
+nexcore doctor
 ```
 
 桌面观察：
 
 ```bash
-node src/cli.js observe '{"surface":"desktop","app":"Calculator","query":"7"}'
+nexcore observe '{"surface":"desktop","app":"Calculator","query":"7"}'
 ```
 
 浏览器点击并验证跳转：
 
 ```bash
-node src/cli.js act '{
+nexcore act '{
   "surface":"browser",
   "url":"https://example.com",
   "action":"click",
@@ -82,6 +80,10 @@ node src/cli.js act '{
 减少模型往返。
 
 ## JS API
+
+```bash
+npm install github:yan-stone-computer/NexcoreCtrlComputer
+```
 
 ```js
 import { createComputer } from "nexcorectrlcomputer";

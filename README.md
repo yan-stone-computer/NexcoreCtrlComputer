@@ -41,16 +41,17 @@ an explicitly gated **PyAutoGUI** fallback.
 ## 30-second demo
 
 ```bash
-git clone https://github.com/yan-stone-computer/NexcoreCtrlComputer.git
-cd NexcoreCtrlComputer
-npm install
-npm install agent-desktop agent-browser
-python -m pip install -r requirements-coordinate.txt   # optional fallback
-node src/cli.js doctor
+npm install -g github:yan-stone-computer/NexcoreCtrlComputer
+npm install -g agent-desktop agent-browser
+python -m pip install pyautogui                          # optional fallback
+nexcore doctor
 
-node src/cli.js observe '{"surface":"desktop","app":"Calculator","query":"7"}'
-node src/cli.js act '{"surface":"desktop","app":"Calculator","action":"click","target":{"role":"button","name":"7"}}'
+nexcore observe '{"surface":"desktop","app":"Calculator","query":"7"}'
+nexcore act '{"surface":"desktop","app":"Calculator","action":"click","target":{"role":"button","name":"7"}}'
 ```
+
+Working from a clone instead? Run `npm link`, then use the same `nexcore`
+commands.
 
 Desktop refs look like this:
 
@@ -63,7 +64,7 @@ desktop app "Calculator"
 A browser run looks like this:
 
 ```bash
-node src/cli.js act '{
+nexcore act '{
   "surface": "browser",
   "url": "https://example.com",
   "action": "click",
@@ -133,6 +134,12 @@ This keeps the tool catalog stable while the agent performs multi-step work:
 ```
 
 ## Use it from JavaScript
+
+Install the package into your project:
+
+```bash
+npm install github:yan-stone-computer/NexcoreCtrlComputer
+```
 
 ```js
 import { createComputer } from "nexcorectrlcomputer";
