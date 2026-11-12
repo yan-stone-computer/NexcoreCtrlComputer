@@ -1,0 +1,55 @@
+<svg width="1200" height="420" viewBox="0 0 1200 420" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="420" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#07111F"/>
+      <stop offset="0.55" stop-color="#0B1B2C"/>
+      <stop offset="1" stop-color="#10291D"/>
+    </linearGradient>
+    <linearGradient id="line" x1="120" y1="80" x2="1080" y2="350" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#54E6FF"/>
+      <stop offset="0.5" stop-color="#88FFB5"/>
+      <stop offset="1" stop-color="#FFCB6B"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="9" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M40 0H0V40" stroke="#6BD9FF" stroke-opacity="0.07"/>
+    </pattern>
+  </defs>
+  <rect width="1200" height="420" rx="28" fill="url(#bg)"/>
+  <rect width="1200" height="420" rx="28" fill="url(#grid)"/>
+  <circle cx="1050" cy="70" r="170" fill="#49F2B3" fill-opacity="0.07"/>
+  <circle cx="150" cy="380" r="210" fill="#49B8FF" fill-opacity="0.08"/>
+  <text x="72" y="103" fill="#DFF9FF" font-family="Inter, Segoe UI, sans-serif" font-size="54" font-weight="700">NexcoreCtrlComputer</text>
+  <text x="75" y="153" fill="#8FF5FF" font-family="Inter, Segoe UI, sans-serif" font-size="22" font-weight="500">One tool. Two surfaces. Zero pixels by default.</text>
+  <g filter="url(#glow)">
+    <path d="M95 254H250" stroke="url(#line)" stroke-width="4" stroke-linecap="round"/>
+    <path d="M310 254H465" stroke="url(#line)" stroke-width="4" stroke-linecap="round"/>
+    <path d="M525 254H680" stroke="url(#line)" stroke-width="4" stroke-linecap="round"/>
+    <path d="M680 254C760 254 742 332 820 332H1000" stroke="url(#line)" stroke-width="4" stroke-linecap="round"/>
+    <path d="M680 254C760 254 742 182 820 182H1000" stroke="url(#line)" stroke-width="4" stroke-linecap="round"/>
+  </g>
+  <g font-family="Inter, Segoe UI, sans-serif" font-size="17" font-weight="650">
+    <rect x="95" y="216" width="170" height="76" rx="16" fill="#0E2235" stroke="#47C9EF" stroke-opacity="0.7"/>
+    <text x="118" y="247" fill="#E8FAFF">Agent / MCP</text>
+    <text x="118" y="272" fill="#65DDFA" font-size="13" font-weight="500">1 compact schema</text>
+    <rect x="310" y="216" width="170" height="76" rx="16" fill="#0E2235" stroke="#47C9EF" stroke-opacity="0.7"/>
+    <text x="336" y="247" fill="#E8FAFF">Nexcore</text>
+    <text x="336" y="272" fill="#65DDFA" font-size="13" font-weight="500">policy · diff · verify</text>
+    <rect x="525" y="216" width="170" height="76" rx="16" fill="#0E2235" stroke="#47C9EF" stroke-opacity="0.7"/>
+    <text x="551" y="247" fill="#E8FAFF">Accessibility</text>
+    <text x="551" y="272" fill="#65DDFA" font-size="13" font-weight="500">refs, not guesses</text>
+    <rect x="820" y="144" width="205" height="76" rx="16" fill="#102A22" stroke="#6BFFC2" stroke-opacity="0.7"/>
+    <text x="848" y="175" fill="#E8FFF6">agent-desktop</text>
+    <text x="848" y="200" fill="#78FFC7" font-size="13" font-weight="500">native apps</text>
+    <rect x="820" y="294" width="205" height="76" rx="16" fill="#1D2415" stroke="#FFD16F" stroke-opacity="0.7"/>
+    <text x="848" y="325" fill="#FFF8E8">agent-browser</text>
+    <text x="848" y="350" fill="#FFD976" font-size="13" font-weight="500">web · CDP</text>
+  </g>
+  <g font-family="Inter, Segoe UI, sans-serif" font-size="14" font-weight="600">
+    <rect x="1039" y="79" width="84" height="30" rx="15" fill="#FFFFFF" fill-opacity="0.08" stroke="#FFFFFF" stroke-opacity="0.18"/>
+    <text x="1057" y="99" fill="#B8F7E7">v0.1 alpha</text>
+  </g>
+</svg>

@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "nexcore": {
+      "command": "nexcore",
+      "args": ["mcp"],
+      "env": {
+        "NEXCORE_SESSION": "default",
+        "NEXCORE_ALLOWED_APPS": "Calculator",
+        "NEXCORE_ALLOWED_DOMAINS": "example.com"
+      }
+    }
+  }
+}

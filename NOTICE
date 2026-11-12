@@ -1,0 +1,27 @@
+NexcoreCtrlComputer
+===================
+
+Copyright (c) 2026 NexcoreCtrlComputer contributors.
+
+NexcoreCtrlComputer is an independent orchestration layer. It does not bundle
+or copy source code from the projects below. It invokes their documented CLIs
+or APIs as optional runtime backends.
+
+agent-desktop
+https://github.com/vercel-labs/agent-desktop
+License: Apache-2.0
+Use: accessibility-first desktop observation and semantic actions.
+
+agent-browser
+https://github.com/vercel-labs/agent-browser
+License: Apache-2.0
+Use: browser automation through the Chrome DevTools Protocol and compact
+accessibility snapshots.
+
+PyAutoGUI
+https://github.com/asweigart/pyautogui
+License: BSD-3-Clause
+Use: explicitly enabled coordinate fallback for canvas or inaccessible UI.
+
+See each upstream project for its complete license, notices, security guidance,
+and platform requirements.

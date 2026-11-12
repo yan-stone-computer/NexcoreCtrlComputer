@@ -1,0 +1,68 @@
+{
+  "name": "nexcorectrlcomputer",
+  "version": "0.1.0",
+  "description": "Accessibility-first control plane for computer-use agents. One tool, lower token cost, verified actions.",
+  "type": "module",
+  "license": "MIT",
+  "author": "yan-stone-computer",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yan-stone-computer/NexcoreCtrlComputer.git"
+  },
+  "homepage": "https://github.com/yan-stone-computer/NexcoreCtrlComputer",
+  "bugs": {
+    "url": "https://github.com/yan-stone-computer/NexcoreCtrlComputer/issues"
+  },
+  "bin": {
+    "nexcore": "./src/cli.js",
+    "nexcore-mcp": "./src/mcp.js"
+  },
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": [
+    "src",
+    "scripts",
+    "assets",
+    "docs",
+    "examples",
+    "requirements-coordinate.txt",
+    "README.md",
+    "README.zh-CN.md",
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
+    "SECURITY.md",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "scripts": {
+    "test": "node --test",
+    "bench": "node tests/bench.js",
+    "example": "node examples/quickstart.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "peerDependencies": {
+    "agent-browser": ">=0.42.0",
+    "agent-desktop": ">=1.2.0"
+  },
+  "peerDependenciesMeta": {
+    "agent-browser": {
+      "optional": true
+    },
+    "agent-desktop": {
+      "optional": true
+    }
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "computer-use",
+    "desktop",
+    "browser",
+    "accessibility",
+    "mcp",
+    "automation"
+  ]
+}
