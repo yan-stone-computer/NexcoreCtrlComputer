@@ -326,25 +326,28 @@ export class ProgramStore {
   }
 }
 
+function compactVerification(verification) {
+  if (!verification) return undefined;
+  const observed = verification.observed;
+  return {
+    ok: verification.ok,
+    property: verification.property,
+    expected: verification.expected,
+    observed: observed && typeof observed === "object"
+      ? observed.value ?? observed.url ?? observed.result ?? observed
+      : observed
+  };
+}
+
 export class ProgramRuntime {
   constructor(computer, store) {
     this.computer = computer;
     this.store = store;
   }
 
-  async run(name, params = {}, options = {}) {
+  async run(name, params = {}) {
     const source = this.store.get(name);
     const compiled = compileProgram(source, params);
-    if (options.dryRun) {
-      return {
-        ok: true,
-        dryRun: true,
-        program: compiled.name,
-        version: compiled.version,
-        digest: compiled.digest,
-        steps: compiled.steps
-      };
-    }
     const started = Date.now();
     const results = await this.computer.run(compiled.steps);
     const failure = results.find((item) => !item.ok);
@@ -370,7 +373,7 @@ export class ProgramRuntime {
         action,
         ref,
         delivery,
-        verification,
+        verification: compactVerification(verification),
         revision,
         bytes,
         estimatedTokens

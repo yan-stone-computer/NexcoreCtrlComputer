@@ -1,17 +1,17 @@
 <p align="center">
-  <img src="./assets/hero.svg" alt="NexcoreCtrlComputer: one tool, two surfaces, zero pixels by default" width="100%">
+  <img src="./assets/hero.svg" alt="NexcoreCtrlComputer: compile once, replay across desktop and browser" width="100%">
 </p>
 
 <h1 align="center">NexcoreCtrlComputer</h1>
 
 <p align="center">
-  <strong>The missing control plane for computer-use agents.</strong><br>
-  Accessibility-first. One MCP tool. Verified actions. Far fewer visual tokens.
+  <strong>Compile once. Reuse across desktop and browser.</strong><br>
+  Semantic UI programs with local target resolution and verified replay.
 </p>
 
 <p align="center">
   <a href="https://github.com/yan-stone-computer/NexcoreCtrlComputer/actions/workflows/ci.yml"><img alt="ci" src="https://github.com/yan-stone-computer/NexcoreCtrlComputer/actions/workflows/ci.yml/badge.svg"></a>
-  <img alt="status" src="https://img.shields.io/badge/status-v0.1%20alpha-f59e0b">
+  <img alt="status" src="https://img.shields.io/badge/status-v0.2%20alpha-f59e0b">
   <img alt="node" src="https://img.shields.io/badge/node-%3E%3D20-339933">
   <img alt="runtime dependencies" src="https://img.shields.io/badge/runtime%20deps-0-16a34a">
   <img alt="license" src="https://img.shields.io/badge/license-MIT-2563eb">
@@ -19,16 +19,22 @@
 
 > Your agent does not need a 4K screenshot to click a button called "Save".
 
-Most computer-use stacks send pixels, coordinates, and tool schemas back and
-forth until the token bill becomes the product. NexcoreCtrlComputer treats the
-OS accessibility tree as the primary API, keeps short-lived element refs, and
-adds one reusable control plane above **agent-desktop**, **agent-browser**, and
-an explicitly gated **PyAutoGUI** fallback.
+Most computer-use stacks send pixels, coordinates, and the same multi-step plan
+back and forth until the token bill becomes the product. NexcoreCtrlComputer
+introduces a new primitive: a parameterized semantic UI program. Compile a
+cross-surface workflow once, then let the local runtime resolve fresh targets,
+execute, verify, and return one compact outcome.
+
+It is built on **agent-desktop**, **agent-browser**, and an explicitly gated
+**PyAutoGUI** fallback, but the durable asset is your program, not a screenshot
+or an agent prompt.
 
 ## Why this exists
 
 | Problem | Nexcore's answer |
 |---|---|
+| The same workflow is replanned every run | Parameterized semantic programs |
+| Desktop and browser plans live only in prompts | One cross-surface executable artifact |
 | Screenshots are expensive and ambiguous | Semantic role/name/ref snapshots |
 | Coordinates break when DPI or layout changes | Accessibility-first actions |
 | Dozens of tools bloat agent context | One `computer` MCP tool |
@@ -37,6 +43,60 @@ an explicitly gated **PyAutoGUI** fallback.
 | Blind retries double-click real controls | Backend retry disposition is preserved |
 | Pixel automation is unsafe by default | Headed and coordinate modes are opt-in |
 | Every agent reimplements backend quirks | One normalized JS/CLI/MCP contract |
+
+## The new primitive
+
+Semantic programs store intent and contracts, never screenshots, coordinates,
+or snapshot-qualified refs:
+
+```json
+{
+  "schema": "nexcore.program/v1",
+  "name": "browser.fill",
+  "version": "1.0.0",
+  "params": {
+    "value": { "type": "string", "required": true }
+  },
+  "steps": [
+    {
+      "act": {
+        "surface": "browser",
+        "action": "fill",
+        "target": { "role": "textbox", "name": "Name" },
+        "text": "{{value}}",
+        "expect": { "property": "value", "value": "{{value}}" }
+      }
+    }
+  ]
+}
+```
+
+```bash
+nexcore program save ./examples/programs/browser-fill.json
+nexcore program run browser.fill '{"value":"Ada"}'
+```
+
+The model does not resend the steps. It sends one call:
+
+```json
+{
+  "mode": "program_run",
+  "programName": "browser.fill",
+  "params": { "value": "Ada" }
+}
+```
+
+At replay time:
+
+1. parameters are type-checked and interpolated;
+2. desktop targets try exact accessibility find, then named-context scoping,
+   then compact snapshots;
+3. browser selectors and semantic targets are resolved inside the active
+   session;
+4. every declared postcondition is checked;
+5. unsafe post-delivery retries are refused.
+
+Read the [program reference](./docs/PROGRAMS.md) for the complete schema.
 
 ## 30-second demo
 
@@ -99,11 +159,13 @@ verifies navigation. No screenshot is sent to the model.
 }
 ```
 
-Modes: `status`, `observe`, `act`, `run`, `close`.
+Modes: `status`, `observe`, `act`, `run`, `program_save`, `program_list`,
+`program_run`, `close`.
 
 Actions: open, click, double-click, right-click, hover, focus, fill, type,
-press, select, check, uncheck, toggle, expand, collapse, scroll, coordinate
-click, and screenshot.
+press, select, check, uncheck, toggle, expand, collapse, and scroll. Coordinate
+click and screenshot remain explicit one-off actions and are rejected inside
+stored programs.
 
 This keeps the tool catalog stable while the agent performs multi-step work:
 
@@ -185,8 +247,8 @@ AutoGen, CrewAI, Claude, Codex, or a custom MCP client.
 
 ## Token reduction without hand-waving
 
-The included fixture benchmark compares raw pretty-printed accessibility JSON
-with Nexcore's compact observation:
+The included fixture benchmark compares raw accessibility JSON with a compact
+observation, then compares an inline plan with a program replay call:
 
 ```bash
 npm run bench
@@ -197,6 +259,11 @@ npm run bench
 raw:     8,406 bytes  (~2,102 estimated tokens)
 compact: 2,155 bytes    (~539 estimated tokens)
 reduction: 74.4%
+
+two-step browser plan
+inline:     213 bytes  (~54 estimated tokens)
+program:     85 bytes  (~22 estimated tokens)
+reduction: 60.1%
 ```
 
 These are UTF-8 byte and `bytes / 4` estimates on a synthetic fixture, not a
@@ -258,6 +325,7 @@ NEXCORE_DESKTOP_BIN       absolute backend path
 NEXCORE_BROWSER_BIN       absolute backend path
 NEXCORE_PYTHON_BIN        Python executable
 NEXCORE_SESSION           isolated session name
+NEXCORE_PROGRAM_DIR       semantic program registry directory
 NEXCORE_ALLOW_HEADED      "1" to enable physical input
 NEXCORE_ALLOW_COORDINATES "1" to enable PyAutoGUI coordinate actions
 NEXCORE_ALLOWED_APPS      comma-separated desktop allowlist
@@ -272,8 +340,10 @@ Validated on Windows with Node 24, `agent-desktop` 1.2.0,
 - accessibility grant and backend doctor
 - live desktop snapshot and value verification
 - live browser click and URL verification
+- live parameterized browser program save and verified replay
+- live cross-surface program spanning a Chromium page and a native app
 - MCP protocol smoke test
-- unit tests for compaction, diffing, and policy
+- unit tests for compiler, storage, contextual resolution, and policies
 
 macOS and Linux support comes through the same upstream accessibility engines,
 but is not yet covered by this repository's live CI. Contributions that run real

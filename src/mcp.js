@@ -2,7 +2,7 @@
 import { createInterface } from "node:readline";
 import { createComputer } from "./index.js";
 
-const VERSION = "0.1.0";
+const VERSION = "0.2.0";
 
 const tool = {
   name: "computer",
@@ -91,7 +91,6 @@ const tool = {
       program: { type: "object", description: "For mode=program_save: a nexcore.program/v1 definition." },
       programName: { type: "string", description: "For mode=program_run: saved semantic program name." },
       params: { type: "object", description: "For mode=program_run: typed program parameters." },
-      dryRun: { type: "boolean", description: "Compile a program without executing its steps." },
       continueOnError: { type: "boolean" }
     },
     additionalProperties: false
@@ -132,7 +131,7 @@ async function call(args) {
   if (mode === "program_save") return computer.saveProgram(args.program);
   if (mode === "program_list") return computer.listPrograms();
   if (mode === "program_run") {
-    return computer.runProgram(args.programName, args.params || {}, { dryRun: args.dryRun });
+    return computer.runProgram(args.programName, args.params || {});
   }
   if (mode === "close") {
     await computer.close();
@@ -150,7 +149,7 @@ async function handle(message) {
       capabilities: { tools: { listChanged: false } },
       serverInfo: { name: "nexcorectrlcomputer", version: VERSION },
       instructions:
-        "Use computer(mode=observe) first. Act on fresh refs or role/name targets. Add expect to actions that must be verified. Use screenshots only when the accessibility tree cannot represent the target."
+        "Prefer saved semantic programs for repeated workflows: use program_run with parameters. For new work, observe, act on role/name targets, and add expect where state matters. Screenshots are a manual last resort."
     });
     return;
   }

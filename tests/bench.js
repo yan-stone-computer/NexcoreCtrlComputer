@@ -18,11 +18,48 @@ const raw = JSON.stringify({ app: "Fixture", tree }, null, 2);
 const compact = compactDesktopSnapshot({ tree }).text;
 const rawBytes = Buffer.byteLength(raw);
 const compactBytes = Buffer.byteLength(compact);
+const inlinePlan = JSON.stringify({
+  mode: "run",
+  steps: [
+    {
+      act: {
+        surface: "browser",
+        action: "fill",
+        target: { role: "textbox", name: "Name" },
+        text: "Ada"
+      }
+    },
+    {
+      act: {
+        surface: "browser",
+        action: "click",
+        target: { role: "button", name: "Save" }
+      }
+    }
+  ]
+});
+const programCall = JSON.stringify({
+  mode: "program_run",
+  programName: "browser.fill-and-save",
+  params: { value: "Ada" }
+});
+const inlineBytes = Buffer.byteLength(inlinePlan);
+const programBytes = Buffer.byteLength(programCall);
 console.log(JSON.stringify({
-  fixture: "30-node synthetic accessibility tree",
-  rawBytes,
-  compactBytes,
-  reductionPercent: Number((100 - (compactBytes / rawBytes) * 100).toFixed(1)),
-  estimatedRawTokens: Math.ceil(rawBytes / 4),
-  estimatedCompactTokens: Math.ceil(compactBytes / 4)
+  snapshot: {
+    fixture: "30-node synthetic accessibility tree",
+    rawBytes,
+    compactBytes,
+    reductionPercent: Number((100 - (compactBytes / rawBytes) * 100).toFixed(1)),
+    estimatedRawTokens: Math.ceil(rawBytes / 4),
+    estimatedCompactTokens: Math.ceil(compactBytes / 4)
+  },
+  programReplay: {
+    fixture: "two-step browser plan",
+    inlineBytes,
+    programBytes,
+    reductionPercent: Number((100 - (programBytes / inlineBytes) * 100).toFixed(1)),
+    estimatedInlineTokens: Math.ceil(inlineBytes / 4),
+    estimatedProgramTokens: Math.ceil(programBytes / 4)
+  }
 }, null, 2));

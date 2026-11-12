@@ -561,6 +561,7 @@ export class Computer {
       "--timeout-ms",
       "5000"
     ];
+    if (target.first) args.push("--first");
     if (target.near) {
       if (!target.near.role || !target.near.name) {
         throw new NexcoreError("INVALID_TARGET", "A contextual target needs near.role and near.name.", { retry: "safe" });
@@ -844,8 +845,14 @@ export class Computer {
     const results = [];
     for (const [index, step] of steps.entries()) {
       try {
-        const mode = step.mode || (step.observe ? "observe" : step.act ? "act" : step.action ? "act" : null);
-        const payload = step.observe || step.act || step;
+        const mode = step.mode || (
+          step.observe ? "observe" :
+          step.act ? "act" :
+          step.verify ? "verify" :
+          step.action ? "act" :
+          null
+        );
+        const payload = step.observe || step.act || step.verify || step;
         if (mode === "observe") {
           const result = await this.observe(payload);
           results.push({ index, ok: true, ...result });
@@ -885,7 +892,7 @@ export class Computer {
 
   runProgram(name, params = {}, options = {}) {
     this._ensureOpen();
-    return this.programRuntime.run(name, params, options);
+    return this.programRuntime.run(name, params);
   }
 
   async close() {

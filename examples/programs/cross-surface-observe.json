@@ -1,0 +1,40 @@
+{
+  "schema": "nexcore.program/v1",
+  "name": "cross-surface.observe",
+  "version": "1.0.0",
+  "description": "Observe a browser page and a native application in one program.",
+  "params": {
+    "app": {
+      "type": "string",
+      "required": true
+    },
+    "query": {
+      "type": "string",
+      "required": true
+    }
+  },
+  "steps": [
+    {
+      "act": {
+        "surface": "browser",
+        "action": "open",
+        "url": "data:text/html,<main><button>Save</button></main>"
+      }
+    },
+    {
+      "observe": {
+        "surface": "browser",
+        "query": "Save",
+        "delta": false
+      }
+    },
+    {
+      "observe": {
+        "surface": "desktop",
+        "app": "{{app}}",
+        "query": "{{query}}",
+        "delta": false
+      }
+    }
+  ]
+}

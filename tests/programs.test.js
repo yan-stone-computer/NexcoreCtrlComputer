@@ -84,6 +84,24 @@ test("compiler rejects cross-run refs, coordinates, and headed mode", () => {
     }),
     /headed/i
   );
+  assert.throws(
+    () => compileProgram({
+      schema: "nexcore.program/v1",
+      name: "unsafe.screenshot",
+      version: "1.0.0",
+      steps: [{ act: { action: "screenshot" } }]
+    }),
+    /screenshot/i
+  );
+  assert.throws(
+    () => compileProgram({
+      schema: "nexcore.program/v1",
+      name: "unsafe.script",
+      version: "1.0.0",
+      steps: [{ act: { action: "click", target: { role: "button", name: "OK" }, script: "alert(1)" } }]
+    }),
+    /script/i
+  );
 });
 
 test("program store saves, lists, and loads portable JSON", () => {
@@ -118,7 +136,18 @@ test("runtime delegates compiled steps and omits routine observation text", asyn
       calls.push(steps);
       return [
         { index: 0, ok: true, text: "large snapshot", bytes: 9999 },
-        { index: 1, ok: true, action: "click", ref: "@e1" }
+        {
+          index: 1,
+          ok: true,
+          action: "click",
+          ref: "@e1",
+          verification: {
+            ok: true,
+            property: "value",
+            expected: "Save",
+            observed: { lifecycle: { huge: "backend metadata" }, value: "Save" }
+          }
+        }
       ];
     }
   };
@@ -138,6 +167,7 @@ test("runtime delegates compiled steps and omits routine observation text", asyn
   assert.equal(result.ok, true);
   assert.equal(calls[0][0].act.target.name, "Save");
   assert.equal(result.steps[0].text, undefined);
+  assert.equal(result.steps[1].verification.observed, "Save");
 });
 
 test("Computer exposes semantic program methods", async () => {

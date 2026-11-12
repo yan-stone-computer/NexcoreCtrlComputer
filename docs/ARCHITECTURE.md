@@ -3,8 +3,12 @@
 ```text
 agent / MCP / JS / CLI
           |
-      one contract
+      one tool
           |
+   semantic program runtime
+     | compile + parameters
+     | atomic program store
+     | adaptive target resolver
   policy -> compact -> verify
           |
   +-------+--------+
@@ -32,6 +36,12 @@ UIA / AX / AT-SPI  CDP
    amount of polymorphism required for desktop, browser, and batch execution.
 6. Coordinate automation is an exception path, not the default. It is gated by
    policy and protected by PyAutoGUI's corner fail-safe.
+7. Reusable automation is stored as semantic program JSON. The source contains
+   role/name/context targets and state contracts, never snapshot refs,
+   coordinates, or screenshot bytes.
+8. Program replay starts with exact accessibility find for desktop targets,
+   scopes through a named ancestor when context is required, then falls back to
+   bounded snapshots. Visual fallback is never automatic.
 
 ## Backend ownership
 

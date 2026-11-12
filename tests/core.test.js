@@ -155,3 +155,30 @@ test("browser contextual targets fail closed instead of dropping context", async
     /contextual.*desktop/i
   );
 });
+
+test("run executes standalone verify steps", async () => {
+  const computer = new Computer({ desktopBin: "unused" });
+  computer.verify = async (payload) => ({ ok: true, property: payload.property, expected: payload.value });
+  const results = await computer.run([
+    { verify: { property: "value", value: "7" } }
+  ]);
+  assert.equal(results[0].ok, true);
+  assert.equal(results[0].expected, "7");
+});
+
+test("exact find preserves an explicit first-match request", async () => {
+  const computer = new Computer({ desktopBin: "unused" });
+  let args;
+  computer._desktop = async (value) => {
+    args = value;
+    return {
+      data: { match: { ref_id: "@sfound:e1", role: "button", name: "7" } },
+      elapsedMs: 1
+    };
+  };
+  await computer._resolveTargetDetailed({
+    app: "Calculator",
+    target: { role: "button", name: "7", first: true }
+  }, "desktop");
+  assert.ok(args.includes("--first"));
+});

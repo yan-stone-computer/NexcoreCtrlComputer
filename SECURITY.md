@@ -9,6 +9,8 @@ take irreversible actions. Treat every observation and action as privileged.
 - Coordinate control is disabled.
 - Accessibility refs are preferred over screenshots and pixels.
 - Browser domains and desktop applications can be allowlisted.
+- Stored programs reject coordinates, snapshot refs, screenshots, headed mode,
+  shell commands, and arbitrary JavaScript.
 - CLI sessions stay warm, but they are never closed with a command that closes
   unrelated user applications.
 - PyAutoGUI's corner fail-safe remains enabled.

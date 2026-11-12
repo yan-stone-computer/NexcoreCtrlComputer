@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -32,6 +33,9 @@ test("MCP exposes one compact computer tool", async () => {
   child.kill();
 
   const rows = output.trim().split("\n").map((line) => JSON.parse(line));
+  const packageVersion = JSON.parse(readFileSync(join(root, "package.json"), "utf8")).version;
+  const initialized = rows.find((row) => row.id === 1);
+  assert.equal(initialized.result.serverInfo.version, packageVersion);
   const list = rows.find((row) => row.id === 2);
   assert.equal(list.result.tools.length, 1);
   assert.equal(list.result.tools[0].name, "computer");

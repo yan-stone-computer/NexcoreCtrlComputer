@@ -1,6 +1,6 @@
 {
   "name": "nexcorectrlcomputer",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Accessibility-first control plane for computer-use agents. One tool, lower token cost, verified actions.",
   "type": "module",
   "license": "MIT",
@@ -24,7 +24,8 @@
     "src",
     "scripts",
     "assets",
-    "docs",
+    "docs/ARCHITECTURE.md",
+    "docs/PROGRAMS.md",
     "examples",
     "requirements-coordinate.txt",
     "README.md",
@@ -38,6 +39,7 @@
   "scripts": {
     "test": "node --test",
     "bench": "node tests/bench.js",
+    "smoke:program": "node scripts/smoke-program.mjs",
     "example": "node examples/quickstart.mjs"
   },
   "engines": {
