@@ -98,6 +98,13 @@ At replay time:
 
 Read the [program reference](./docs/PROGRAMS.md) for the complete schema.
 
+## Architecture
+
+![NexcoreCtrlComputer semantic program architecture](./assets/architecture.svg)
+
+The model submits intent; the local runtime owns the durable program, target
+resolution ladder, policy, action execution, and state proof.
+
 ## 30-second demo
 
 ```bash

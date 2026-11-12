@@ -1,0 +1,121 @@
+<svg width="1400" height="760" viewBox="0 0 1400 760" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="archBg" x1="0" y1="0" x2="1400" y2="760" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#07101D"/>
+      <stop offset="0.52" stop-color="#0A1728"/>
+      <stop offset="1" stop-color="#0D241B"/>
+    </linearGradient>
+    <linearGradient id="flow" x1="190" y1="160" x2="1160" y2="610" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#55E5FF"/>
+      <stop offset="0.55" stop-color="#80FFB9"/>
+      <stop offset="1" stop-color="#FFD16F"/>
+    </linearGradient>
+    <pattern id="archGrid" width="36" height="36" patternUnits="userSpaceOnUse">
+      <path d="M36 0H0V36" stroke="#6AD9FF" stroke-opacity="0.055"/>
+    </pattern>
+    <filter id="archGlow" x="-25%" y="-25%" width="150%" height="150%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <marker id="arrow" markerWidth="11" markerHeight="11" refX="8" refY="5.5" orient="auto">
+      <path d="M1 1L9 5.5L1 10V1Z" fill="#77F3D1"/>
+    </marker>
+  </defs>
+
+  <rect width="1400" height="760" rx="30" fill="url(#archBg)"/>
+  <rect width="1400" height="760" rx="30" fill="url(#archGrid)"/>
+  <circle cx="1300" cy="90" r="220" fill="#55FFB0" fill-opacity="0.055"/>
+  <circle cx="95" cy="690" r="250" fill="#4CC9FF" fill-opacity="0.055"/>
+
+  <g font-family="Inter, Segoe UI, sans-serif">
+    <text x="58" y="64" fill="#F0FBFF" font-size="34" font-weight="720">Nexcore Semantic Program Architecture</text>
+    <text x="59" y="96" fill="#8AE9F8" font-size="16" font-weight="500">The model sends intent once. The runtime owns resolution, safety, execution, and proof.</text>
+  </g>
+
+  <rect x="48" y="130" width="236" height="178" rx="22" fill="#0B1D30" stroke="#42C9EF" stroke-opacity="0.5"/>
+  <text x="74" y="165" fill="#71E8FF" font-family="Inter, Segoe UI, sans-serif" font-size="12" font-weight="700" letter-spacing="1.5">CALLERS</text>
+  <text x="74" y="198" fill="#EDFDFF" font-family="Inter, Segoe UI, sans-serif" font-size="22" font-weight="680">Agent / Harness</text>
+  <g font-family="Inter, Segoe UI, sans-serif" font-size="14" font-weight="550">
+    <rect x="74" y="218" width="82" height="30" rx="15" fill="#10283C" stroke="#39C7ED" stroke-opacity="0.35"/>
+    <text x="91" y="238" fill="#BFEFFF">MCP</text>
+    <rect x="164" y="218" width="64" height="30" rx="15" fill="#10283C" stroke="#39C7ED" stroke-opacity="0.35"/>
+    <text x="181" y="238" fill="#BFEFFF">JS</text>
+    <rect x="236" y="218" width="30" height="30" rx="15" fill="#10283C" stroke="#39C7ED" stroke-opacity="0.35"/>
+    <text x="245" y="238" fill="#BFEFFF">C</text>
+  </g>
+  <text x="74" y="279" fill="#8EAEC3" font-family="Inter, Segoe UI, sans-serif" font-size="13">one compact tool schema</text>
+  <text x="74" y="298" fill="#8EAEC3" font-family="Inter, Segoe UI, sans-serif" font-size="13">program_run(name, params)</text>
+
+  <path d="M284 219H350" stroke="url(#flow)" stroke-width="3.5" stroke-linecap="round" marker-end="url(#arrow)"/>
+
+  <rect x="350" y="130" width="236" height="178" rx="22" fill="#0D2032" stroke="#4FE1C1" stroke-opacity="0.5"/>
+  <text x="376" y="165" fill="#72FFD0" font-family="Inter, Segoe UI, sans-serif" font-size="12" font-weight="700" letter-spacing="1.5">PROGRAM PLANE</text>
+  <text x="376" y="198" fill="#F0FFF9" font-family="Inter, Segoe UI, sans-serif" font-size="22" font-weight="680">Compiler</text>
+  <text x="376" y="231" fill="#A7C9BE" font-family="Inter, Segoe UI, sans-serif" font-size="13">typed parameters + defaults</text>
+  <text x="376" y="253" fill="#A7C9BE" font-family="Inter, Segoe UI, sans-serif" font-size="13">unsafe-field rejection</text>
+  <text x="376" y="275" fill="#A7C9BE" font-family="Inter, Segoe UI, sans-serif" font-size="13">semantic locator contracts</text>
+  <text x="376" y="297" fill="#A7C9BE" font-family="Inter, Segoe UI, sans-serif" font-size="13">digest + normalized steps</text>
+
+  <path d="M586 219H650" stroke="url(#flow)" stroke-width="3.5" stroke-linecap="round" marker-end="url(#arrow)"/>
+
+  <rect x="650" y="112" width="294" height="214" rx="24" fill="#101F2D" stroke="#67F7B8" stroke-opacity="0.55"/>
+  <text x="678" y="147" fill="#7DFFC2" font-family="Inter, Segoe UI, sans-serif" font-size="12" font-weight="700" letter-spacing="1.5">LOCAL EXECUTION</text>
+  <text x="678" y="181" fill="#F3FFF8" font-family="Inter, Segoe UI, sans-serif" font-size="24" font-weight="700">Program Runtime</text>
+  <g font-family="Inter, Segoe UI, sans-serif" font-size="13">
+    <rect x="678" y="201" width="112" height="42" rx="11" fill="#0B2A22" stroke="#5BEBB0" stroke-opacity="0.35"/>
+    <text x="692" y="217" fill="#DFFFF1" font-weight="650">Registry</text>
+    <text x="692" y="234" fill="#80C9AA" font-size="11">atomic JSON</text>
+    <rect x="803" y="201" width="113" height="42" rx="11" fill="#0B2A22" stroke="#5BEBB0" stroke-opacity="0.35"/>
+    <text x="817" y="217" fill="#DFFFF1" font-weight="650">Policy</text>
+    <text x="817" y="234" fill="#80C9AA" font-size="11">allowlists</text>
+    <rect x="678" y="255" width="112" height="42" rx="11" fill="#0B2A22" stroke="#5BEBB0" stroke-opacity="0.35"/>
+    <text x="692" y="271" fill="#DFFFF1" font-weight="650">State</text>
+    <text x="692" y="288" fill="#80C9AA" font-size="11">expect + retry</text>
+    <rect x="803" y="255" width="113" height="42" rx="11" fill="#0B2A22" stroke="#5BEBB0" stroke-opacity="0.35"/>
+    <text x="817" y="271" fill="#DFFFF1" font-weight="650">Results</text>
+    <text x="817" y="288" fill="#80C9AA" font-size="11">compact proof</text>
+  </g>
+
+  <path d="M944 219H1004" stroke="url(#flow)" stroke-width="3.5" stroke-linecap="round" marker-end="url(#arrow)"/>
+
+  <rect x="1004" y="112" width="338" height="214" rx="24" fill="#15221B" stroke="#FFD16F" stroke-opacity="0.5"/>
+  <text x="1032" y="147" fill="#FFDA83" font-family="Inter, Segoe UI, sans-serif" font-size="12" font-weight="700" letter-spacing="1.5">ADAPTIVE PERCEPTION</text>
+  <text x="1032" y="181" fill="#FFF8E6" font-family="Inter, Segoe UI, sans-serif" font-size="24" font-weight="700">Target Resolver</text>
+  <g font-family="Inter, Segoe UI, sans-serif" font-size="13" font-weight="600">
+    <rect x="1032" y="202" width="280" height="28" rx="8" fill="#1C2D20"/>
+    <text x="1048" y="221" fill="#B9FFD0">1  exact accessibility find</text>
+    <rect x="1032" y="238" width="280" height="28" rx="8" fill="#1C2D20"/>
+    <text x="1048" y="257" fill="#B9FFD0">2  named-context subtree</text>
+    <rect x="1032" y="274" width="280" height="28" rx="8" fill="#1C2D20"/>
+    <text x="1048" y="293" fill="#B9FFD0">3  bounded compact snapshot</text>
+    <text x="1048" y="316" fill="#E9B64E" font-size="12" font-weight="700">4  fail closed — never guess</text>
+  </g>
+
+  <path d="M795 326V382H422V452" stroke="url(#flow)" stroke-width="3.5" stroke-linecap="round" marker-end="url(#arrow)"/>
+  <path d="M1173 326V382H978V452" stroke="url(#flow)" stroke-width="3.5" stroke-linecap="round" marker-end="url(#arrow)"/>
+
+  <rect x="250" y="452" width="344" height="198" rx="24" fill="#0C2331" stroke="#45D8FF" stroke-opacity="0.52"/>
+  <text x="282" y="490" fill="#7DE8FF" font-family="Inter, Segoe UI, sans-serif" font-size="12" font-weight="700" letter-spacing="1.5">NATIVE SURFACE</text>
+  <text x="282" y="526" fill="#ECFDFF" font-family="Inter, Segoe UI, sans-serif" font-size="25" font-weight="700">agent-desktop</text>
+  <text x="282" y="558" fill="#9CC5D3" font-family="Inter, Segoe UI, sans-serif" font-size="14">UIA · AX · AT-SPI</text>
+  <text x="282" y="588" fill="#85ADBA" font-family="Inter, Segoe UI, sans-serif" font-size="13">role / name / value / refs</text>
+  <text x="282" y="612" fill="#85ADBA" font-family="Inter, Segoe UI, sans-serif" font-size="13">semantic action first</text>
+
+  <rect x="806" y="452" width="344" height="198" rx="24" fill="#272414" stroke="#FFD16F" stroke-opacity="0.52"/>
+  <text x="838" y="490" fill="#FFDA83" font-family="Inter, Segoe UI, sans-serif" font-size="12" font-weight="700" letter-spacing="1.5">WEB SURFACE</text>
+  <text x="838" y="526" fill="#FFF9E9" font-family="Inter, Segoe UI, sans-serif" font-size="25" font-weight="700">agent-browser</text>
+  <text x="838" y="558" fill="#CFC19A" font-family="Inter, Segoe UI, sans-serif" font-size="14">Chrome DevTools Protocol</text>
+  <text x="838" y="588" fill="#BCAD84" font-family="Inter, Segoe UI, sans-serif" font-size="13">accessibility tree + refs</text>
+  <text x="838" y="612" fill="#BCAD84" font-family="Inter, Segoe UI, sans-serif" font-size="13">selector + semantic target</text>
+
+  <path d="M676 652H806" stroke="#FFB868" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="7 7" marker-end="url(#arrow)"/>
+  <rect x="568" y="628" width="108" height="48" rx="12" fill="#2B1E12" stroke="#FFB868" stroke-opacity="0.48"/>
+  <text x="588" y="649" fill="#FFD2A0" font-family="Inter, Segoe UI, sans-serif" font-size="12" font-weight="680">PyAutoGUI</text>
+  <text x="588" y="665" fill="#BF8D61" font-family="Inter, Segoe UI, sans-serif" font-size="10">explicit opt-in only</text>
+
+  <rect x="48" y="690" width="1304" height="38" rx="12" fill="#FFFFFF" fill-opacity="0.045" stroke="#FFFFFF" stroke-opacity="0.08"/>
+  <text x="70" y="714" fill="#9CC3C4" font-family="Inter, Segoe UI, sans-serif" font-size="12" font-weight="550">Invariant: no stored screenshots · no stored coordinates · no snapshot refs · no automatic pixels · no unsafe replay after delivery</text>
+</svg>

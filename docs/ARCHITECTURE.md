@@ -1,5 +1,7 @@
 # Architecture
 
+![NexcoreCtrlComputer semantic program architecture](../assets/architecture.svg)
+
 ```text
 agent / MCP / JS / CLI
           |

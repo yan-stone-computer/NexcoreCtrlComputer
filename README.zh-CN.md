@@ -81,6 +81,13 @@ nexcore program run browser.fill '{"value":"Ada"}'
 
 完整规则见 [程序规范](./docs/PROGRAMS.md)。
 
+## 架构
+
+![NexcoreCtrlComputer 语义程序架构](./assets/architecture.svg)
+
+模型只提交意图；本地运行时负责持久化程序、逐级目标定位、安全策略、动作执行和
+状态证明。
+
 ## 三步跑起来
 
 ```bash
