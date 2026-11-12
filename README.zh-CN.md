@@ -31,7 +31,10 @@
 ## 三步跑起来
 
 ```bash
-npm install -g github:yan-stone-computer/NexcoreCtrlComputer
+git clone https://github.com/yan-stone-computer/NexcoreCtrlComputer.git
+cd NexcoreCtrlComputer
+npm install
+npm link
 npm install -g agent-desktop agent-browser
 python -m pip install pyautogui                         # 可选兜底
 nexcore doctor
@@ -82,7 +85,10 @@ nexcore act '{
 ## JS API
 
 ```bash
-npm install github:yan-stone-computer/NexcoreCtrlComputer
+cd NexcoreCtrlComputer
+npm link
+cd ../your-agent-project
+npm link nexcorectrlcomputer
 ```
 
 ```js

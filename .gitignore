@@ -3,5 +3,6 @@ node_modules/
 *.log
 coverage/
 dist/
+*.tgz
 .env
 .nexcore/
