@@ -4,6 +4,7 @@ import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { ProgramRuntime, ProgramStore } from "./programs.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PY_BRIDGE = join(HERE, "..", "scripts", "pyautogui_bridge.py");
@@ -349,6 +350,8 @@ export class Computer {
     this.config.desktopBin = resolveBackend(this.config.desktopBin, "agent-desktop", "agent-desktop");
     this.config.browserBin = resolveBackend(this.config.browserBin, "agent-browser", "agent-browser");
     this.policy = options.policy instanceof ActionPolicy ? options.policy : new ActionPolicy(options.policy);
+    this.programStore = new ProgramStore({ directory: options.programDir });
+    this.programRuntime = new ProgramRuntime(this, this.programStore);
     this.previous = new Map();
     this.closed = false;
   }
@@ -863,6 +866,26 @@ export class Computer {
       }
     }
     return results;
+  }
+
+  saveProgram(definition) {
+    this._ensureOpen();
+    return this.programStore.save(definition);
+  }
+
+  listPrograms() {
+    this._ensureOpen();
+    return this.programStore.list();
+  }
+
+  getProgram(name) {
+    this._ensureOpen();
+    return this.programStore.get(name);
+  }
+
+  runProgram(name, params = {}, options = {}) {
+    this._ensureOpen();
+    return this.programRuntime.run(name, params, options);
   }
 
   async close() {

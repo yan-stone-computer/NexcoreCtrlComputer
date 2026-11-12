@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { existsSync, readFileSync } from "node:fs";
 import { createComputer, NexcoreError } from "./index.js";
 
 const HELP = `NexcoreCtrlComputer
@@ -9,6 +10,9 @@ Usage:
   nexcore act '<json>'
   nexcore verify '<json>'
   nexcore run '<json-array>'
+  nexcore program save <file-or-json>
+  nexcore program list
+  nexcore program run <name> '<json-params>'
   nexcore mcp
 
 Examples:
@@ -43,6 +47,27 @@ async function main() {
   }
 
   const computer = await createComputer({ session: process.env.NEXCORE_SESSION || "cli" });
+  if (command === "program") {
+    const [subcommand, value, params] = process.argv.slice(3);
+    if (subcommand === "save") {
+      if (!value) throw new NexcoreError("PROGRAM_REQUIRED", "program save needs a file or JSON.", { retry: "safe" });
+      const source = existsSync(value) ? readFileSync(value, "utf8") : value;
+      print(await computer.saveProgram(parseJsonArgument(source, {})));
+      return;
+    }
+    if (subcommand === "list") {
+      print(await computer.listPrograms());
+      return;
+    }
+    if (subcommand === "run") {
+      if (!value) throw new NexcoreError("PROGRAM_REQUIRED", "program run needs a program name.", { retry: "safe" });
+      print(await computer.runProgram(value, parseJsonArgument(params, {})));
+      return;
+    }
+    throw new NexcoreError("UNKNOWN_PROGRAM_COMMAND", `Unknown program command: ${subcommand || ""}`, {
+      retry: "safe"
+    });
+  }
   if (command === "doctor") {
     print(await computer.doctor());
     return;

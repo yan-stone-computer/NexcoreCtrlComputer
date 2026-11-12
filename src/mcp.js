@@ -12,7 +12,11 @@ const tool = {
   inputSchema: {
     type: "object",
     properties: {
-      mode: { type: "string", enum: ["status", "observe", "act", "run", "close"], default: "observe" },
+      mode: {
+        type: "string",
+        enum: ["status", "observe", "act", "run", "program_save", "program_list", "program_run", "close"],
+        default: "observe"
+      },
       surface: { type: "string", enum: ["auto", "desktop", "browser"], default: "auto" },
       app: { type: "string", description: "Desktop application name from list-apps." },
       url: { type: "string", description: "Browser URL. Open it before observing unless open is false." },
@@ -84,6 +88,10 @@ const tool = {
         description: "For mode=run: items containing observe, act, or verify.",
         items: { type: "object" }
       },
+      program: { type: "object", description: "For mode=program_save: a nexcore.program/v1 definition." },
+      programName: { type: "string", description: "For mode=program_run: saved semantic program name." },
+      params: { type: "object", description: "For mode=program_run: typed program parameters." },
+      dryRun: { type: "boolean", description: "Compile a program without executing its steps." },
       continueOnError: { type: "boolean" }
     },
     additionalProperties: false
@@ -121,6 +129,11 @@ async function call(args) {
   }
   if (mode === "act") return computer.act(args);
   if (mode === "run") return computer.run(args.steps || [], { continueOnError: args.continueOnError });
+  if (mode === "program_save") return computer.saveProgram(args.program);
+  if (mode === "program_list") return computer.listPrograms();
+  if (mode === "program_run") {
+    return computer.runProgram(args.programName, args.params || {}, { dryRun: args.dryRun });
+  }
   if (mode === "close") {
     await computer.close();
     return { ok: true };

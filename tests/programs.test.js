@@ -8,6 +8,7 @@ import {
   ProgramStore,
   compileProgram
 } from "../src/programs.js";
+import { createComputer } from "../src/index.js";
 
 const template = {
   schema: "nexcore.program/v1",
@@ -137,4 +138,12 @@ test("runtime delegates compiled steps and omits routine observation text", asyn
   assert.equal(result.ok, true);
   assert.equal(calls[0][0].act.target.name, "Save");
   assert.equal(result.steps[0].text, undefined);
+});
+
+test("Computer exposes semantic program methods", async () => {
+  const computer = await createComputer({ session: "program-api-test" });
+  assert.equal(typeof computer.saveProgram, "function");
+  assert.equal(typeof computer.listPrograms, "function");
+  assert.equal(typeof computer.getProgram, "function");
+  assert.equal(typeof computer.runProgram, "function");
 });

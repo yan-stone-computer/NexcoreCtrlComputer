@@ -1,0 +1,37 @@
+{
+  "schema": "nexcore.program/v1",
+  "name": "browser.fill",
+  "version": "1.0.0",
+  "description": "Fill a labeled browser field and verify its value.",
+  "params": {
+    "value": {
+      "type": "string",
+      "required": true
+    }
+  },
+  "steps": [
+    {
+      "act": {
+        "surface": "browser",
+        "action": "open",
+        "url": "data:text/html,<input aria-label=Name>"
+      }
+    },
+    {
+      "act": {
+        "surface": "browser",
+        "action": "fill",
+        "target": {
+          "role": "textbox",
+          "name": "Name"
+        },
+        "text": "{{value}}",
+        "expect": {
+          "property": "value",
+          "value": "{{value}}",
+          "timeoutMs": 3000
+        }
+      }
+    }
+  ]
+}
