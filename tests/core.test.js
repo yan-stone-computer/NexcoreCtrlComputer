@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   ActionPolicy,
+  Computer,
   compactDesktopSnapshot,
   diffLines,
   estimateTokens,
@@ -71,4 +72,86 @@ test("token estimate and safety policy fail closed", () => {
   assert.throws(() => policy.checkUrl("https://evil.example/docs"), /allowedDomains/);
   assert.throws(() => policy.requireCoordinates(), /Coordinate control/);
   assert.throws(() => policy.requireHeaded("hover", true), /allowHeaded/);
+});
+
+test("desktop semantic targets use exact find before a snapshot", async () => {
+  const computer = new Computer({ desktopBin: "unused" });
+  const calls = [];
+  computer._desktop = async (args) => {
+    calls.push(args);
+    return {
+      data: {
+        match: {
+          ref_id: "@sfound:e1",
+          role: "button",
+          name: "7",
+          path: ["window:Calculator", "button:7"]
+        }
+      },
+      elapsedMs: 3
+    };
+  };
+  const resolved = await computer._resolveTargetDetailed({
+    app: "Calculator",
+    target: { role: "button", name: "7" }
+  }, "desktop");
+  assert.equal(resolved.ref, "@sfound:e1");
+  assert.equal(resolved.strategy, "exact-find");
+  assert.ok(calls[0].includes("find"));
+  assert.ok(calls[0].includes("--exact"));
+});
+
+test("desktop contextual targets scope the target under a named ancestor", async () => {
+  const computer = new Computer({ desktopBin: "unused" });
+  const calls = [];
+  computer._desktop = async (args) => {
+    calls.push(args);
+    const contextCall = calls.length === 2;
+    return {
+      data: {
+        match: contextCall
+          ? { ref_id: "@sfound:e2", role: "button", name: "Delete" }
+          : { ref_id: "@sfound:e1", role: "row", name: "Invoice 42" }
+      },
+      elapsedMs: 1
+    };
+  };
+  const resolved = await computer._resolveTargetDetailed({
+    app: "Invoices",
+    target: {
+      role: "button",
+      name: "Delete",
+      near: { role: "row", name: "Invoice 42" }
+    }
+  }, "desktop");
+  assert.equal(resolved.ref, "@sfound:e2");
+  assert.equal(resolved.strategy, "context-find");
+  assert.equal(calls.length, 2);
+  assert.ok(calls[1].includes("--root"));
+  assert.ok(calls[1].includes("@sfound:e1"));
+});
+
+test("browser selector targets bypass observation", async () => {
+  const computer = new Computer({ desktopBin: "unused" });
+  computer.observe = async () => {
+    throw new Error("selector should not observe");
+  };
+  const resolved = await computer._resolveTargetDetailed({
+    target: { selector: "#save" }
+  }, "browser");
+  assert.deepEqual(resolved, { ref: "#save", strategy: "selector" });
+});
+
+test("browser contextual targets fail closed instead of dropping context", async () => {
+  const computer = new Computer({ desktopBin: "unused" });
+  await assert.rejects(
+    () => computer._resolveTargetDetailed({
+      target: {
+        role: "button",
+        name: "Delete",
+        near: { role: "row", name: "Invoice 42" }
+      }
+    }, "browser"),
+    /contextual.*desktop/i
+  );
 });

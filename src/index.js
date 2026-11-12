@@ -545,13 +545,80 @@ export class Computer {
     return result;
   }
 
-  async _resolveTarget(input, surface) {
-    if (typeof input.target === "string" && input.target.startsWith("@")) return input.target;
-    if (input.target && Number.isFinite(input.target.x) && Number.isFinite(input.target.y)) return input.target;
+  async _desktopExactFind(app, target) {
+    const args = [
+      "find",
+      "--app",
+      app,
+      "--role",
+      target.role,
+      "--name",
+      target.name,
+      "--exact",
+      "--timeout-ms",
+      "5000"
+    ];
+    if (target.near) {
+      if (!target.near.role || !target.near.name) {
+        throw new NexcoreError("INVALID_TARGET", "A contextual target needs near.role and near.name.", { retry: "safe" });
+      }
+      const context = await this._desktopExactFind(app, target.near);
+      if (!context) {
+        throw new NexcoreError("TARGET_NOT_FOUND", "No semantic target matched the context.", {
+          details: { near: target.near },
+          retry: "safe"
+        });
+      }
+      args.push("--root", context.match.ref_id);
+    }
+    const response = await this._desktop(args);
+    const matches = response.data.match ? [response.data.match] : response.data.matches || [];
+    if (matches.length === 0) return null;
+    if (matches.length > 1) {
+      throw new NexcoreError("AMBIGUOUS_TARGET", "More than one exact semantic target matched.", {
+        details: { matches: matches.slice(0, 8) },
+        retry: "safe"
+      });
+    }
+    return { match: matches[0], elapsedMs: response.elapsedMs };
+  }
+
+  async _resolveTargetDetailed(input, surface) {
+    if (typeof input.target === "string" && input.target.startsWith("@")) {
+      return { ref: input.target, strategy: "provided-ref" };
+    }
+    if (surface === "browser" && input.target?.selector) {
+      return { ref: input.target.selector, strategy: "selector" };
+    }
+    if (input.target && Number.isFinite(input.target.x) && Number.isFinite(input.target.y)) {
+      return { ref: input.target, strategy: "coordinates" };
+    }
     if (!input.target) {
       throw new NexcoreError("TARGET_REQUIRED", "This action needs target: a ref, role/name object, or coordinates.", {
         retry: "safe"
       });
+    }
+    if (surface === "browser" && input.target.near) {
+      throw new NexcoreError("INVALID_TARGET", "Contextual targets are currently supported for desktop only.", {
+        retry: "safe"
+      });
+    }
+
+    if (surface === "desktop" && input.app && input.target.role && input.target.name) {
+      try {
+        const exact = await this._desktopExactFind(input.app, input.target);
+        if (exact) {
+          return {
+            ref: exact.match.ref_id,
+            strategy: input.target.near ? "context-find" : "exact-find",
+            path: exact.match.path,
+            elapsedMs: exact.elapsedMs
+          };
+        }
+      } catch (error) {
+        if (error.code === "AMBIGUOUS_TARGET") throw error;
+        if (!["TARGET_NOT_FOUND", "NO_MATCH", "ELEMENT_NOT_FOUND"].includes(error.code)) throw error;
+      }
     }
 
     const observed = await this.observe({
@@ -577,7 +644,11 @@ export class Computer {
         retry: "safe"
       });
     }
-    return matches[0].ref;
+    return { ref: matches[0].ref, strategy: "snapshot-fallback", elapsedMs: observed.elapsedMs };
+  }
+
+  async _resolveTarget(input, surface) {
+    return (await this._resolveTargetDetailed(input, surface)).ref;
   }
 
   async act(input = {}) {
@@ -625,12 +696,14 @@ export class Computer {
     }
 
     let ref = null;
+    let resolution;
     if (action !== "press" && !(surface === "browser" && action === "scroll" && !input.target)) {
       if (surface === "browser" && input.url && typeof input.target !== "string" && input.open !== false) {
         this.policy.checkUrl(input.url);
         await this._browser(["open", input.url], { headed: input.headed });
       }
-      ref = await this._resolveTarget(input, surface);
+      resolution = await this._resolveTargetDetailed(input, surface);
+      ref = resolution.ref;
     }
     let response;
     const timeoutArgs = input.timeoutMs ? ["--timeout-ms", String(input.timeoutMs)] : [];
@@ -705,7 +778,11 @@ export class Computer {
       }
     }
 
-    const result = actionResult(surface, action, response.data, { ref, elapsedMs: response.elapsedMs });
+    const result = actionResult(surface, action, response.data, {
+      ref,
+      resolution,
+      elapsedMs: response.elapsedMs
+    });
     if (input.expect) result.verification = await this.verify({ ...input.expect, surface, app: input.app, url: input.url, ref });
     return result;
   }
