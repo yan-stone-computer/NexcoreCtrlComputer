@@ -139,8 +139,10 @@ nexcore act '{
 ```
 
 支持 `status`、`observe`、`act`、`run`、`program_save`、`program_list`、
-`program_run`、`close`。动作涵盖点击、输入、按键、选择、勾选、展开和滚动。
-截图和坐标点击只能作为显式的一次性动作，不能写进可复用程序。
+`program_run`、`close`。动作涵盖点击、输入、按键、选择、勾选、展开、滚动、
+窗口管理和剪贴板读写。桌面 `observe` 可直接查看 windows、apps、displays、
+notifications、surfaces；这些视图会明确回到桌面通道，不会被之前的浏览器会话
+劫持。截图和坐标点击只能作为显式的一次性动作，不能写进可复用程序。
 
 ## JS API
 

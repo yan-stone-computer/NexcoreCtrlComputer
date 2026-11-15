@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0 - 2026-11-15
+
+- Added desktop inventory views for windows, apps, displays, notifications, and surfaces.
+- Added stable action receipts, focus restoration/retry, window management, and clipboard controls.
+- Added real accessible-text verification and semantic target resolution fallbacks.
+- Fixed browser state leaking into later desktop inventory and window operations.
+- Expanded live Windows coverage for browser-to-desktop switching and Calculator interaction.
+
 ## 0.2.0 - 2026-11-12
 
 - Added compiled, parameterized, cross-surface semantic UI programs.

@@ -8,6 +8,44 @@ import { ProgramRuntime, ProgramStore } from "./programs.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PY_BRIDGE = join(HERE, "..", "scripts", "pyautogui_bridge.py");
+const RECEIPT_SCHEMA = "nexcore.control.receipt/v1";
+const DESKTOP_VIEWS = Object.freeze({
+  windows: "list-windows",
+  displays: "list-displays",
+  apps: "list-apps",
+  notifications: "list-notifications",
+  surfaces: "list-surfaces"
+});
+const WINDOW_ACTIONS = new Set([
+  "window_focus",
+  "window_resize",
+  "window_move",
+  "window_minimize",
+  "window_maximize",
+  "window_restore"
+]);
+const CLIPBOARD_FORMATS = new Set(["text", "auto", "image", "file-urls"]);
+const ACTION_ALIASES = Object.freeze({
+  open_app: "open",
+  launch_app: "open",
+  launch: "open",
+  open_url: "open",
+  navigate: "open",
+  goto: "open",
+  set_value: "fill",
+  click_element: "click",
+  type_text: "type",
+  key: "press",
+  press_key: "press",
+  close_window: "close_app",
+  focus_window: "window_focus",
+  resize_window: "window_resize",
+  move_window: "window_move",
+  minimize_window: "window_minimize",
+  maximize_window: "window_maximize",
+  restore_window: "window_restore",
+  verify: "verify"
+});
 
 const DEFAULTS = Object.freeze({
   session: process.env.NEXCORE_SESSION || "default",
@@ -329,15 +367,65 @@ function targetMatches(entry, target) {
   return roleOk && nameOk;
 }
 
+function controlReceipt(operation, {
+  surface,
+  engine,
+  strategy = "semantic",
+  delivery = "not_delivered",
+  retry = "unsafe",
+  verified = false,
+  revision,
+  complete = true
+} = {}) {
+  return {
+    schema: RECEIPT_SCHEMA,
+    operation,
+    route: { surface, engine, strategy },
+    effect: { delivery, retry },
+    evidence: {
+      ...(revision ? { revision } : {}),
+      complete,
+      verified
+    }
+  };
+}
+
 function actionResult(surface, action, data, extra = {}) {
   const disposition = data?.disposition || data?.result?.disposition || {};
-  return {
+  const delivery = disposition.delivery || (data?.success === false ? "not_delivered" : "delivered");
+  const retry = disposition.retry || "unsafe";
+  const strategy = extra.strategy || extra.resolution?.strategy || "semantic";
+  const result = {
     surface,
     action,
-    delivery: disposition.delivery || (data?.success === false ? "not_delivered" : "delivered"),
-    retry: disposition.retry || "unsafe",
+    delivery,
+    retry,
     ...extra
   };
+  result.receipt = controlReceipt("act", {
+    surface,
+    engine: surface === "browser" ? "browser" : "desktop",
+    strategy,
+    delivery,
+    retry,
+    verified: Boolean(
+      extra.verification?.ok
+      || delivery === "delivered_verified"
+      || delivery === "verified"
+    )
+  });
+  return result;
+}
+
+function numericWindowValue(value, name, min, max) {
+  const number = Number(value);
+  if (!Number.isInteger(number) || number < min || number > max) {
+    throw new NexcoreError("INVALID_WINDOW_VALUE", `${name} must be an integer from ${min} to ${max}.`, {
+      details: { field: name, value },
+      retry: "safe"
+    });
+  }
+  return number;
 }
 
 export class Computer {
@@ -349,10 +437,13 @@ export class Computer {
     };
     this.config.desktopBin = resolveBackend(this.config.desktopBin, "agent-desktop", "agent-desktop");
     this.config.browserBin = resolveBackend(this.config.browserBin, "agent-browser", "agent-browser");
-    this.policy = options.policy instanceof ActionPolicy ? options.policy : new ActionPolicy(options.policy);
+    this.policy = options.policy instanceof ActionPolicy
+      ? options.policy
+      : new ActionPolicy(options.policy || options);
     this.programStore = new ProgramStore({ directory: options.programDir });
     this.programRuntime = new ProgramRuntime(this, this.programStore);
     this.previous = new Map();
+    this.activeSurface = "desktop";
     this.closed = false;
   }
 
@@ -428,9 +519,39 @@ export class Computer {
     } : browser;
     return {
       ok: desktop.ok && browser.ok,
-      desktop: desktopSummary,
-      browser: browserSummary,
-      pyautogui,
+      kernel: {
+        schema: RECEIPT_SCHEMA,
+        pipeline: ["observe", "resolve", "act", "verify", "receipt"],
+        policy: "semantic-first"
+      },
+      capabilities: {
+        observe: ["semantic", "windows", "displays", "apps", "notifications", "surfaces", "browser"],
+        act: [
+          "open", "click", "double_click", "right_click", "hover", "focus", "fill", "type",
+          "press", "select", "check", "uncheck", "toggle", "expand", "collapse", "scroll",
+          "screenshot", "close_app", "window_focus", "window_resize", "window_move", "window_minimize",
+          "window_maximize", "window_restore", "clipboard_get", "clipboard_set", "clipboard_clear"
+        ],
+        verify: ["value", "text", "title", "url", "html", "exists"],
+        safeguards: ["approval", "allowed-apps", "allowed-domains", "semantic-refs", "retry-disposition"]
+      },
+      routes: [
+        {
+          route: "semantic-desktop",
+          state: desktop.ok ? "ready" : "unavailable",
+          detail: desktopSummary
+        },
+        {
+          route: "browser",
+          state: browserSummary.ok ? "ready" : "unavailable",
+          detail: browserSummary
+        },
+        {
+          route: "coordinate-fallback",
+          state: pyautogui.ok && this.policy.allowCoordinates ? "enabled" : pyautogui.ok ? "policy-disabled" : "unavailable",
+          detail: pyautogui
+        }
+      ],
       policy: {
         allowHeaded: this.policy.allowHeaded,
         allowCoordinates: this.policy.allowCoordinates,
@@ -451,10 +572,368 @@ export class Computer {
     return result.data;
   }
 
+  _windowArgs(input, { title = false } = {}) {
+    const args = [];
+    const app = input.app ? String(input.app) : "";
+    const windowId = input.windowId ?? input.window_id;
+    const windowTitle = input.windowTitle ?? input.window_title ?? (title ? input.title : undefined);
+    if (app) {
+      this.policy.checkApp(app);
+      args.push("--app", app);
+    }
+    if (windowId !== undefined && windowId !== null && String(windowId).trim()) {
+      args.push("--window-id", String(windowId).trim());
+    }
+    if (title && windowTitle !== undefined && String(windowTitle).trim()) {
+      args.push("--title", String(windowTitle).trim());
+    }
+    if (!args.length) {
+      throw new NexcoreError("WINDOW_REQUIRED", "This window action needs app, windowId, or windowTitle.", {
+        retry: "safe"
+      });
+    }
+    return args;
+  }
+
+  async _desktopView(input) {
+    const view = String(input.view || "");
+    const command = DESKTOP_VIEWS[view];
+    if (!command) {
+      throw new NexcoreError("INVALID_VIEW", `Unknown desktop view: ${view}`, {
+        details: { supported: Object.keys(DESKTOP_VIEWS) },
+        retry: "safe"
+      });
+    }
+    if (input.app) {
+      input = { ...input, app: this._canonicalApp(input, "observe") };
+      this.policy.checkApp(input.app);
+    }
+    const args = [command];
+    if (input.app) args.push("--app", String(input.app));
+    if (view === "surfaces" && !input.app) {
+      const windowId = input.windowId ?? input.window_id;
+      const windowTitle = input.windowTitle ?? input.window_title ?? input.title;
+      if (!windowId && !windowTitle) {
+        throw new NexcoreError("APP_REQUIRED", "The surfaces view needs app, windowId, or windowTitle.", { retry: "safe" });
+      }
+      const windows = await this._desktop(["list-windows"]);
+      const rows = Array.isArray(windows.data) ? windows.data : windows.data?.windows || [];
+      const matches = rows.filter(item =>
+        (windowId && String(item.id) === String(windowId))
+        || (windowTitle && String(item.title || "").includes(String(windowTitle)))
+      );
+      if (matches.length !== 1) {
+        throw new NexcoreError(
+          matches.length ? "AMBIGUOUS_WINDOW" : "WINDOW_NOT_FOUND",
+          matches.length ? "More than one window matched the surfaces selector." : "No window matched the surfaces selector.",
+          { details: { windowId, windowTitle, matches: matches.slice(0, 8) }, retry: "safe" }
+        );
+      }
+      const app = String(matches[0].app_name || matches[0].process_name || "");
+      if (!app) throw new NexcoreError("APP_NOT_FOUND", "The selected window has no process identity.", { retry: "safe" });
+      this.policy.checkApp(app);
+      args.push("--app", app);
+    }
+    if (view === "notifications") {
+      if (input.query) args.push("--text", String(input.query));
+      if (input.limit) args.push("--limit", String(Math.max(1, Math.min(100, Number(input.limit) || 20))));
+    }
+    const response = await this._desktop(args);
+    const raw = response.data;
+    let items = Array.isArray(raw)
+      ? raw
+      : ["items", "windows", "displays", "apps", "notifications", "surfaces"]
+          .map(key => raw?.[key])
+          .find(Array.isArray) || [];
+    /**
+     * UWP 窗口可能由 ApplicationFrameHost 持有，list-apps 会对用户看到的进程名返回空。
+     * windows 视图仍能给出窗口真实 app_name；筛选 apps 时用同一身份补一条应用记录。
+     */
+    if (view === "apps" && input.app && items.length === 0) {
+      const windows = await this._desktop(["list-windows", "--app", String(input.app)]);
+      const windowRows = Array.isArray(windows.data) ? windows.data : windows.data?.windows || [];
+      if (windowRows.length) {
+        items = [{
+          name: String(input.app),
+          windowCount: windowRows.length,
+          pids: [...new Set(windowRows.map(item => item.pid).filter(Number.isFinite))],
+          windows: windowRows.map(item => ({ id: item.id, title: item.title, pid: item.pid, bounds: item.bounds }))
+        }];
+      }
+    }
+    const query = String(input.query || "").toLocaleLowerCase();
+    const filtered = (query && view !== "notifications"
+      ? items.filter(item => JSON.stringify(item).toLocaleLowerCase().includes(query))
+      : items
+    ).slice(0, Math.max(1, Math.min(100, Number(input.maxItems) || 40)));
+    const text = filtered.length
+      ? filtered.map((item, index) => `${index + 1}. ${truncate(JSON.stringify(item), 220)}`).join("\n")
+      : `(no ${view})`;
+    const key = ["view", this.config.session, view, input.app || "", query, input.maxItems || ""].join(":");
+    const remembered = this._remember(key, text);
+    const output = input.delta !== false && remembered.previous ? diffLines(remembered.previous.text, text) : text;
+    return {
+      surface: "desktop",
+      view,
+      count: filtered.length,
+      total: items.length,
+      complete: true,
+      text: output,
+      items: filtered,
+      revision: remembered.revision,
+      elapsedMs: response.elapsedMs,
+      receipt: controlReceipt("observe", {
+        surface: "desktop",
+        engine: "windows",
+        strategy: view,
+        delivery: "observed",
+        retry: "safe",
+        verified: true,
+        revision: remembered.revision
+      })
+    };
+  }
+
+  async _windowApp(input) {
+    if (input.app) {
+      const app = this._canonicalApp(input, input.action || "observe");
+      this.policy.checkApp(app);
+      return app;
+    }
+    const windowId = input.windowId ?? input.window_id;
+    const windowTitle = input.windowTitle ?? input.window_title ?? input.title;
+    const focused = ["focused", "active"].includes(String(input.surface || "").toLocaleLowerCase());
+    if (!windowId && !windowTitle && !focused) return "";
+    const windows = await this._desktop(["list-windows"]);
+    const rows = Array.isArray(windows.data) ? windows.data : windows.data?.windows || [];
+    const matches = rows.filter(item =>
+      (windowId && String(item.id) === String(windowId))
+      || (windowTitle && String(item.title || "").includes(String(windowTitle)))
+      || (focused && item.is_focused === true)
+    );
+    if (matches.length !== 1) {
+      throw new NexcoreError(
+        matches.length ? "AMBIGUOUS_WINDOW" : "WINDOW_NOT_FOUND",
+        matches.length ? "More than one window matched the semantic observer." : "No window matched the semantic observer.",
+        { details: { windowId, windowTitle, focused, matches: matches.slice(0, 8) }, retry: "safe" }
+      );
+    }
+    const app = this._canonicalApp({ app: String(matches[0].app_name || matches[0].process_name || "") }, input.action || "observe");
+    if (!app) throw new NexcoreError("APP_NOT_FOUND", "The selected window has no process identity.", { retry: "safe" });
+    this.policy.checkApp(app);
+    return app;
+  }
+
+  _canonicalApp(input = {}, action = "") {
+    const raw = String(input.app || "").trim();
+    if (!raw) return "";
+    const key = raw.toLocaleLowerCase();
+    const aliases = {
+      edge: "msedge.exe",
+      "microsoft edge": "msedge.exe",
+      chrome: "chrome.exe",
+      "google chrome": "chrome.exe",
+      firefox: "firefox.exe",
+      notepad: "notepad.exe",
+      "记事本": "notepad.exe",
+      explorer: "explorer.exe",
+      "file explorer": "explorer.exe",
+      "文件资源管理器": "explorer.exe",
+      calculator: "CalculatorApp.exe",
+      calc: "CalculatorApp.exe",
+      "计算器": "CalculatorApp.exe"
+    };
+    let app = aliases[key] || raw;
+    if (action === "open") {
+      const candidates = {
+        "CalculatorApp.exe": ["C:\\Windows\\System32\\calc.exe"],
+        "msedge.exe": [
+          join(process.env["ProgramFiles(x86)"] || "", "Microsoft", "Edge", "Application", "msedge.exe"),
+          join(process.env.ProgramFiles || "", "Microsoft", "Edge", "Application", "msedge.exe")
+        ],
+        "chrome.exe": [
+          join(process.env.ProgramFiles || "", "Google", "Chrome", "Application", "chrome.exe"),
+          join(process.env["ProgramFiles(x86)"] || "", "Google", "Chrome", "Application", "chrome.exe")
+        ],
+        "notepad.exe": [join(process.env.SystemRoot || "C:\\Windows", "System32", "notepad.exe")]
+      }[app] || [];
+      app = candidates.find(candidate => candidate && existsSync(candidate)) || app;
+    }
+    return app;
+  }
+
+  async _windowAction(input, action) {
+    const commands = {
+      window_focus: "focus-window",
+      window_resize: "resize-window",
+      window_move: "move-window",
+      window_minimize: "minimize",
+      window_maximize: "maximize",
+      window_restore: "restore"
+    };
+    const args = [commands[action], ...this._windowArgs(input, { title: action === "window_focus" })];
+    if (action === "window_resize") {
+      args.push(
+        "--width",
+        String(numericWindowValue(input.width, "width", 100, 10000)),
+        "--height",
+        String(numericWindowValue(input.height, "height", 100, 10000))
+      );
+    } else if (action === "window_move") {
+      args.push(
+        "--x",
+        String(numericWindowValue(input.x, "x", -100000, 100000)),
+        "--y",
+        String(numericWindowValue(input.y, "y", -100000, 100000))
+      );
+    }
+    if (action === "window_focus") {
+      const windows = await this._desktop(["list-windows"]);
+      const rows = Array.isArray(windows.data) ? windows.data : windows.data?.windows || [];
+      const windowId = input.windowId ?? input.window_id;
+      const windowTitle = input.windowTitle ?? input.window_title ?? input.title;
+      const app = input.app ? String(input.app) : "";
+      const target = rows.find(item =>
+        (windowId && String(item.id) === String(windowId))
+        || (windowTitle && String(item.title || "").includes(String(windowTitle)))
+        || (!windowId && !windowTitle && app && String(item.app_name || item.process_name || "").toLocaleLowerCase() === app.toLocaleLowerCase())
+      );
+      const robustArgs = ["focus-window"];
+      if (target?.app_name) robustArgs.push("--app", String(target.app_name));
+      if (target?.id) robustArgs.push("--window-id", String(target.id));
+      if (target?.title) robustArgs.push("--title", String(target.title));
+      const focusArgs = robustArgs.length > 1 ? robustArgs : args;
+      if (target?.minimized) await this._desktop(["restore", "--window-id", target.id], { headed: true });
+      try {
+        const response = await this._desktop(focusArgs);
+        return actionResult("desktop", action, response.data, {
+          window: input.windowId ?? input.window_id ?? target?.id ?? null,
+          strategy: "native-window",
+          elapsedMs: response.elapsedMs
+        });
+      } catch (firstError) {
+        await new Promise(resolvePromise => setTimeout(resolvePromise, 250));
+        if (target?.id) await this._desktop(["restore", "--window-id", target.id], { headed: true }).catch(() => {});
+        try {
+          const response = await this._desktop(focusArgs);
+          return actionResult("desktop", action, response.data, {
+            window: input.windowId ?? input.window_id ?? target?.id ?? null,
+            strategy: "native-window-retry",
+            elapsedMs: response.elapsedMs + 250,
+            retryAfter: firstError.code || "ACTION_FAILED"
+          });
+        } catch (secondError) {
+          if (!this.policy.allowHeaded || !target?.bounds) throw secondError;
+          const bounds = target.bounds;
+          const x = Math.round(Number(bounds.x) + Number(bounds.width) / 2);
+          const y = Math.round(Number(bounds.y) + 12);
+          try {
+            await this._pyautogui({ action: "click", x, y, timeoutMs: this.config.timeoutMs });
+          } catch {
+            await this._desktop(["mouse-click", "--xy", `${x},${y}`], { headed: true });
+          }
+          await new Promise(resolvePromise => setTimeout(resolvePromise, 180));
+          const after = await this._desktop(["list-windows"]);
+          const afterRows = Array.isArray(after.data) ? after.data : after.data?.windows || [];
+          const focused = afterRows.find(item => String(item.id) === String(target.id));
+          if (!focused?.is_focused) throw secondError;
+          return {
+            surface: "desktop",
+            action,
+            delivery: "delivered_verified",
+            retry: "unsafe",
+            window: target.id,
+            focused,
+            receipt: controlReceipt("act", {
+              surface: "desktop",
+              engine: "windows",
+              strategy: "titlebar-focus",
+              delivery: "delivered_verified",
+              retry: "unsafe",
+              verified: true
+            })
+          };
+        }
+      }
+    }
+    const response = await this._desktop(args);
+    return actionResult("desktop", action, response.data, {
+      window: input.windowId ?? input.window_id ?? null,
+      strategy: "native-window",
+      elapsedMs: response.elapsedMs
+    });
+  }
+
+  async _clipboardAction(input, action) {
+    if (action === "clipboard_get") {
+      const format = String(input.format || "text");
+      if (!CLIPBOARD_FORMATS.has(format)) {
+        throw new NexcoreError("INVALID_CLIPBOARD_FORMAT", `Unknown clipboard format: ${format}`, {
+          details: { supported: [...CLIPBOARD_FORMATS] },
+          retry: "safe"
+        });
+      }
+      const response = await this._desktop(["clipboard-get", "--format", format]);
+      return actionResult("desktop", action, response.data, {
+        format,
+        strategy: "native-clipboard",
+        elapsedMs: response.elapsedMs
+      });
+    }
+    if (action === "clipboard_set") {
+      const value = String(input.text ?? input.value ?? "");
+      if (Buffer.byteLength(value, "utf8") > 128 * 1024) {
+        throw new NexcoreError("CLIPBOARD_TOO_LARGE", "Clipboard text is limited to 128 KiB.", {
+          retry: "safe"
+        });
+      }
+      const response = await this._desktop(["clipboard-set", "--stdin"], { input: value });
+      return actionResult("desktop", action, response.data, {
+        bytes: Buffer.byteLength(value, "utf8"),
+        strategy: "native-clipboard",
+        elapsedMs: response.elapsedMs
+      });
+    }
+    const response = await this._desktop(["clipboard-clear"]);
+    return actionResult("desktop", action, response.data, {
+      strategy: "native-clipboard",
+      elapsedMs: response.elapsedMs
+    });
+  }
+
   _surface(input) {
-    if (input.surface && input.surface !== "auto") return input.surface;
-    if (input.url) return "browser";
-    return "desktop";
+    const action = String(input.action || "").toLocaleLowerCase();
+    const view = String(input.view || "").toLocaleLowerCase();
+    const windowId = input.windowId ?? input.window_id;
+    const windowTitle = input.windowTitle ?? input.window_title ?? input.title;
+    const ref = typeof input.target === "string" ? input.target : input.target?.ref || input.ref;
+    const browserAction = ["open_url", "navigate", "goto"].includes(action);
+    const desktopAction = WINDOW_ACTIONS.has(action)
+      || ["open_app", "launch_app", "launch", "close_app", "close_window"].includes(action)
+      || action.startsWith("clipboard_")
+      || /^@live:/i.test(String(ref || ""));
+    let surface;
+    if (input.surface === "desktop" || input.surface === "browser") {
+      surface = input.surface;
+    } else if (input.url || browserAction || (input.target?.selector && !windowId)) {
+      surface = "browser";
+    } else if (
+      DESKTOP_VIEWS[view]
+      || ["semantic", "window", "tree", "accessibility"].includes(view)
+      || input.app
+      || windowId
+      || windowTitle
+      || ["focused", "active"].includes(String(input.surface || "").toLocaleLowerCase())
+      || desktopAction
+    ) {
+      surface = "desktop";
+    } else if (this.activeSurface === "browser") {
+      surface = "browser";
+    } else {
+      surface = "desktop";
+    }
+    this.activeSurface = surface;
+    return surface;
   }
 
   _remember(key, text) {
@@ -468,6 +947,27 @@ export class Computer {
   async observe(input = {}) {
     this._ensureOpen();
     const surface = this._surface(input);
+    const requestedView = String(input.view || "").toLocaleLowerCase();
+    const windowId = input.windowId ?? input.window_id;
+    const windowTitle = input.windowTitle ?? input.window_title ?? input.title;
+    const focusedSurface = ["focused", "active"].includes(String(input.surface || "").toLocaleLowerCase());
+    const semanticAlias = ["semantic", "window", "tree", "accessibility"].includes(requestedView)
+      || (["apps", "surfaces"].includes(requestedView) && Boolean(windowId || windowTitle || focusedSurface));
+    if (surface === "desktop" && semanticAlias) {
+      const app = input.app || await this._windowApp({ ...input, view: requestedView });
+      input = {
+        ...input,
+        app,
+        view: undefined,
+        surfaceKind: input.surfaceKind || (focusedSurface ? "focused" : input.surface)
+      };
+    }
+    if (surface === "desktop" && input.view) {
+      const viewed = await this._desktopView(input);
+      viewed.bytes = Buffer.byteLength(viewed.text, "utf8");
+      viewed.estimatedTokens = estimateTokens(viewed.text);
+      return viewed;
+    }
     const delta = input.delta !== false;
     const key = [
       surface,
@@ -477,7 +977,8 @@ export class Computer {
       input.selector || "",
       input.depth || "",
       input.maxNodes || "",
-      input.interactiveOnly !== false
+      input.interactiveOnly !== false,
+      input.view || ""
     ].join(":");
     let result;
 
@@ -508,14 +1009,24 @@ export class Computer {
         complete: response.data.complete !== false,
         text: output,
         refs: compact.refs,
-        elapsedMs: response.elapsedMs
+        elapsedMs: response.elapsedMs,
+        receipt: controlReceipt("observe", {
+          surface,
+          engine: "desktop",
+          strategy: "accessibility",
+          delivery: "observed",
+          retry: "safe",
+          verified: true,
+          revision: remembered.revision,
+          complete: response.data.complete !== false
+        })
       };
     } else if (surface === "browser") {
       this.policy.checkUrl(input.url);
       if (input.url && input.open !== false) {
         await this._browser(["open", input.url]);
       }
-      const args = ["snapshot", "-i", "-c"];
+      const args = input.selector ? ["snapshot", "-c"] : ["snapshot", "-i", "-c"];
       if (input.depth) args.push("-d", String(Math.max(1, Math.min(50, input.depth))));
       if (input.selector) args.push("-s", input.selector);
       const response = await this._browser(args);
@@ -537,7 +1048,16 @@ export class Computer {
         complete: true,
         text: output,
         refs: compact.refs.filter((entry) => targetMatches(entry, input.target)),
-        elapsedMs: response.elapsedMs
+        elapsedMs: response.elapsedMs,
+        receipt: controlReceipt("observe", {
+          surface,
+          engine: "browser",
+          strategy: "accessibility",
+          delivery: "observed",
+          retry: "safe",
+          verified: true,
+          revision: remembered.revision
+        })
       };
     } else {
       throw new NexcoreError("INVALID_SURFACE", `Unknown surface: ${surface}`, { retry: "safe" });
@@ -590,6 +1110,9 @@ export class Computer {
   async _resolveTargetDetailed(input, surface) {
     if (typeof input.target === "string" && input.target.startsWith("@")) {
       return { ref: input.target, strategy: "provided-ref" };
+    }
+    if (typeof input.target?.ref === "string" && input.target.ref.startsWith("@")) {
+      return { ref: input.target.ref, strategy: "provided-ref" };
     }
     if (surface === "browser" && input.target?.selector) {
       return { ref: input.target.selector, strategy: "selector" };
@@ -658,8 +1181,24 @@ export class Computer {
   async act(input = {}) {
     this._ensureOpen();
     const surface = this._surface(input);
-    const action = input.action;
+    let action = ACTION_ALIASES[String(input.action || "").toLocaleLowerCase()] || input.action;
     if (!action) throw new NexcoreError("ACTION_REQUIRED", "action is required.", { retry: "safe" });
+    if (action === "focus" && (input.target?.role === "window" || input.windowId || input.window_id || input.windowTitle || input.window_title)) {
+      action = "window_focus";
+      input = { ...input, ...(input.target?.role === "window" && input.target.name ? { windowTitle: input.target.name } : {}) };
+      if (input.target?.role === "window") delete input.target;
+    }
+    if (action === "verify") {
+      return this.verify({ ...input, action: undefined });
+    }
+    if (action === "press" && input.key !== undefined && input.keys === undefined) input = { ...input, keys: input.key };
+    input = { ...input, action };
+    if (action === "open" && !input.app && typeof input.target === "string" && !input.target.startsWith("@")) input.app = input.target;
+    if (action === "open" && !input.app && input.target?.name && !input.target.ref && !input.target.selector) input.app = input.target.name;
+    if (input.app) {
+      input.app = this._canonicalApp(input, action);
+      this.policy.checkApp(input.app);
+    }
     this.policy.requireHeaded(action, input.headed);
 
     if (action === "coordinate_click") {
@@ -669,7 +1208,20 @@ export class Computer {
         throw new NexcoreError("TARGET_REQUIRED", "coordinate_click needs {x,y}.", { retry: "safe" });
       }
       const data = await this._pyautogui({ action: "click", x: target.x, y: target.y, timeoutMs: this.config.timeoutMs });
-      return { surface: "coordinate", action, delivery: "delivered_unverified", retry: "unsafe", data };
+      return {
+        surface: "coordinate",
+        action,
+        delivery: "delivered_unverified",
+        retry: "unsafe",
+        data,
+        receipt: controlReceipt("act", {
+          surface: "desktop",
+          engine: "coordinate",
+          strategy: "explicit-coordinate",
+          delivery: "delivered_unverified",
+          retry: "unsafe"
+        })
+      };
     }
 
     if (action === "open") {
@@ -681,14 +1233,26 @@ export class Computer {
       }
       this.policy.checkApp(input.app);
       if (!input.app) throw new NexcoreError("APP_REQUIRED", "Desktop open needs app.", { retry: "safe" });
+      const requestedTimeout = Number(input.timeoutMs);
+      const launchTimeout = Number.isFinite(requestedTimeout) && requestedTimeout > 0 ? requestedTimeout : 10000;
       const response = await this._desktop([
         "launch",
         input.app,
-        "--activate",
         "--timeout",
-        String(input.timeoutMs || this.config.timeoutMs)
+        String(Math.min(launchTimeout, this.config.timeoutMs))
       ], { headed: input.headed });
-      return actionResult("desktop", action, response.data, { elapsedMs: response.elapsedMs });
+      return {
+        ...actionResult("desktop", action, response.data, { elapsedMs: response.elapsedMs }),
+        delivery: "delivered_unverified",
+        window: "unverified",
+        receipt: controlReceipt("act", {
+          surface: "desktop",
+          engine: "windows",
+          strategy: "process-launch",
+          delivery: "delivered_unverified",
+          retry: "unsafe"
+        })
+      };
     }
 
     if (action === "screenshot") {
@@ -697,6 +1261,41 @@ export class Computer {
         ? await this._desktop(["screenshot", path, ...(input.app ? ["--app", input.app] : [])], { headed: input.headed })
         : await this._browser(["screenshot", path], { headed: input.headed });
       return actionResult(surface, action, response.data, { path, elapsedMs: response.elapsedMs });
+    }
+
+    if (action === "close_app") {
+      if (surface !== "desktop") {
+        throw new NexcoreError("INVALID_SURFACE", "close_app is only available on the desktop surface.", {
+          retry: "safe"
+        });
+      }
+      if (!input.app) throw new NexcoreError("APP_REQUIRED", "close_app needs app.", { retry: "safe" });
+      this.policy.checkApp(input.app);
+      const args = ["close-app", String(input.app)];
+      if (input.force === true) args.push("--force");
+      const response = await this._desktop(args);
+      return actionResult("desktop", action, response.data, {
+        strategy: "native-process",
+        elapsedMs: response.elapsedMs
+      });
+    }
+
+    if (WINDOW_ACTIONS.has(action)) {
+      if (surface !== "desktop") {
+        throw new NexcoreError("INVALID_SURFACE", `${action} is only available on the desktop surface.`, {
+          retry: "safe"
+        });
+      }
+      return this._windowAction(input, action);
+    }
+
+    if (action === "clipboard_get" || action === "clipboard_set" || action === "clipboard_clear") {
+      if (surface !== "desktop") {
+        throw new NexcoreError("INVALID_SURFACE", `${action} is only available on the desktop surface.`, {
+          retry: "safe"
+        });
+      }
+      return this._clipboardAction(input, action);
     }
 
     let ref = null;
@@ -787,15 +1386,24 @@ export class Computer {
       resolution,
       elapsedMs: response.elapsedMs
     });
-    if (input.expect) result.verification = await this.verify({ ...input.expect, surface, app: input.app, url: input.url, ref });
+    if (input.expect) {
+      const expectation = { ...input.expect, surface, app: input.app, url: input.url };
+      if (!input.expect.ref && !input.expect.target) expectation.ref = ref;
+      result.verification = await this.verify(expectation);
+    }
+    if (result.verification?.ok) result.delivery = "delivered_verified";
+    result.receipt.evidence.verified = Boolean(result.verification?.ok);
+    result.receipt.effect.delivery = result.delivery;
+    result.receipt.effect.retry = result.retry;
     return result;
   }
 
   async verify(expect = {}) {
     this._ensureOpen();
     const surface = expect.surface || "desktop";
-    const property = expect.property || "value";
-    const expected = String(expect.value ?? "");
+    const requestedProperty = expect.property || "value";
+    const property = requestedProperty === "name" ? "text" : requestedProperty;
+    const expected = String(expect.value ?? (property === "exists" ? expect.target?.name ?? "" : ""));
     const timeoutMs = expect.timeoutMs || this.config.verifyTimeoutMs;
     const ref = property === "url" ? null : expect.ref || await this._resolveTarget(
       { ...expect, target: expect.target },
@@ -803,30 +1411,101 @@ export class Computer {
     );
 
     if (surface === "desktop") {
+      if (property === "text" || property === "title") {
+        const deadline = Date.now() + timeoutMs;
+        let last;
+        while (Date.now() <= deadline) {
+          const response = await this._desktop(["get", "--property", property, ref]);
+          last = response.data;
+          const observed = typeof last === "string"
+            ? last
+            : String(last?.text ?? last?.title ?? last?.value ?? last?.result ?? "");
+          if (observed.trim() === expected.trim()) {
+            return {
+              ok: true,
+              ref,
+              property,
+              expected,
+              observed: last,
+              receipt: controlReceipt("verify", {
+                surface,
+                engine: "desktop",
+                strategy: property,
+                delivery: "verified",
+                retry: "safe",
+                verified: true
+              })
+            };
+          }
+          await new Promise((resolvePromise) => setTimeout(resolvePromise, 120));
+        }
+        throw new NexcoreError("VERIFY_TIMEOUT", `Expected ${property}=${expected}; last value did not match.`, {
+          details: { ref, last },
+          retry: "unsafe"
+        });
+      }
       const predicate = property === "value" ? "value" : property;
-      const response = await this._desktop([
+      const args = [
         "wait",
         "--element",
         ref,
         "--predicate",
         predicate,
-        "--value",
-        expected,
         "--timeout",
         String(timeoutMs)
-      ]);
-      return { ok: response.data.found === true, ref, property, expected, observed: response.data.observed };
+      ];
+      if (predicate === "value") args.push("--value", expected);
+      const response = await this._desktop(args);
+      const ok = response.data.found === true;
+      return {
+        ok,
+        ref,
+        property,
+        expected,
+        observed: {
+          ...(response.data.observed || {}),
+          ...(property === "exists" && expect.target?.name ? { target_name: expect.target.name, matched: ok } : {})
+        },
+        receipt: controlReceipt("verify", {
+          surface,
+          engine: "desktop",
+          strategy: property,
+          delivery: ok ? "verified" : "unverified",
+          retry: ok ? "safe" : "unsafe",
+          verified: ok
+        })
+      };
     }
 
     const deadline = Date.now() + timeoutMs;
     let last;
     while (Date.now() <= deadline) {
-      const response = property === "url"
-        ? await this._browser(["get", "url"])
-        : await this._browser(["get", property, ref]);
+      const response = property === "url" || property === "title"
+        ? await this._browser(["get", property])
+        : property === "exists"
+          ? await this._browser(["get", "count", ref])
+          : await this._browser(["get", property, ref]);
       last = response.data;
-      const observed = String(last?.url ?? last?.value ?? last?.result ?? last ?? "");
-      if (observed === expected) return { ok: true, ref, property, expected, observed: last };
+      const observed = property === "exists"
+        ? Number(last?.count ?? last ?? 0) > 0
+        : String(last?.url ?? last?.text ?? last?.value ?? last?.title ?? last?.html ?? last?.result ?? last ?? "");
+      if (property === "exists" ? observed : observed === expected) {
+        return {
+          ok: true,
+          ref,
+          property,
+          expected,
+          observed: last,
+          receipt: controlReceipt("verify", {
+            surface,
+            engine: "browser",
+            strategy: property,
+            delivery: "verified",
+            retry: "safe",
+            verified: true
+          })
+        };
+      }
       await new Promise((resolvePromise) => setTimeout(resolvePromise, 120));
     }
     throw new NexcoreError("VERIFY_TIMEOUT", `Expected ${property}=${expected}; last value did not match.`, {

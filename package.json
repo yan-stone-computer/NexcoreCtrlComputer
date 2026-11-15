@@ -1,6 +1,6 @@
 {
   "name": "nexcorectrlcomputer",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Accessibility-first control plane for computer-use agents. One tool, lower token cost, verified actions.",
   "type": "module",
   "license": "MIT",

@@ -142,6 +142,30 @@ test("browser selector targets bypass observation", async () => {
   assert.deepEqual(resolved, { ref: "#save", strategy: "selector" });
 });
 
+test("desktop inventory views escape a previous browser session", async () => {
+  const computer = new Computer({ desktopBin: "unused", browserBin: "unused" });
+  const calls = [];
+  computer._browser = async (args) => {
+    calls.push(["browser", ...args]);
+    return { data: { url: "https://example.com" }, elapsedMs: 1 };
+  };
+  computer._desktop = async (args) => {
+    calls.push(["desktop", ...args]);
+    return {
+      data: [{ id: "w-calc", app_name: "CalculatorApp.exe", title: "Calculator" }],
+      elapsedMs: 1
+    };
+  };
+
+  await computer.act({ action: "open_url", url: "https://example.com" });
+  const apps = await computer.observe({ view: "apps", delta: false });
+  const windows = await computer.observe({ view: "windows", delta: false });
+
+  assert.equal(apps.surface, "desktop");
+  assert.equal(windows.surface, "desktop");
+  assert.deepEqual(calls.slice(1).map((args) => args[1]), ["list-apps", "list-windows"]);
+});
+
 test("browser contextual targets fail closed instead of dropping context", async () => {
   const computer = new Computer({ desktopBin: "unused" });
   await assert.rejects(

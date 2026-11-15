@@ -11,7 +11,7 @@
 
 <p align="center">
   <a href="https://github.com/yan-stone-computer/NexcoreCtrlComputer/actions/workflows/ci.yml"><img alt="ci" src="https://github.com/yan-stone-computer/NexcoreCtrlComputer/actions/workflows/ci.yml/badge.svg"></a>
-  <img alt="status" src="https://img.shields.io/badge/status-v0.2%20alpha-f59e0b">
+  <img alt="status" src="https://img.shields.io/badge/status-v0.3%20alpha-f59e0b">
   <img alt="node" src="https://img.shields.io/badge/node-%3E%3D20-339933">
   <img alt="runtime dependencies" src="https://img.shields.io/badge/runtime%20deps-0-16a34a">
   <img alt="license" src="https://img.shields.io/badge/license-MIT-2563eb">
@@ -170,9 +170,12 @@ Modes: `status`, `observe`, `act`, `run`, `program_save`, `program_list`,
 `program_run`, `close`.
 
 Actions: open, click, double-click, right-click, hover, focus, fill, type,
-press, select, check, uncheck, toggle, expand, collapse, and scroll. Coordinate
-click and screenshot remain explicit one-off actions and are rejected inside
-stored programs.
+press, select, check, uncheck, toggle, expand, collapse, scroll, window
+management, and clipboard read/write. Desktop inventory is available through
+`observe` views for windows, apps, displays, notifications, and surfaces. These
+views always return to the desktop route, even after a browser session.
+Coordinate click and screenshot remain explicit one-off actions and are rejected
+inside stored programs.
 
 This keeps the tool catalog stable while the agent performs multi-step work:
 
