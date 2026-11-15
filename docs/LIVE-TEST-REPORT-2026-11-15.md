@@ -1,6 +1,6 @@
 # 电脑控制真机测试报告
 
-测试对象：NexcoreWork `2.5.5`，Windows 11，前台真实 UI 输入。
+测试对象：NexcoreWork `2.5.6`，Windows 11，前台真实 UI 输入。
 
 ## 结果总览
 
@@ -94,3 +94,18 @@ Windows 拒绝后台进程直接抢占前台时，`window_focus` 和 Windows-MCP
 ## 结论
 
 本轮不是“全部通过”。真实测试发现并修复了连续按键、焦点文本输入和浏览器标题读取三个核心问题；保存对话框和前台焦点仍需要持续加固。
+
+## 常用软件启动回归
+
+按实际使用频率收敛为 17 个常用入口，不再遍历全部 Start Menu 项目。Bandizip、ChatGPT、Claude、Everything、Chrome、LibreOffice、Edge、Obsidian、Outlook、PotPlayer、QQ、VS Code、WPS、微信、微信开发者工具、记事本和计算器均完成真实启动。
+
+结果：`17/17` 通过。
+
+第一次复跑中 `Everything`、`PotPlayer` 和微信报 `Not connected`。根因是巡检脚本误杀了 Windows-MCP 的 `uv.exe` 启动进程，不是控制内核连接失败。脚本现已保护 MCP、Python 和系统辅助进程，并且只处理本轮拉起的应用进程。
+
+最终回归：
+
+- Computer Ctrl：`30/30`
+- 全量测试：`252/252`
+- TypeScript：通过
+- 常用软件真机启动：`17/17`
