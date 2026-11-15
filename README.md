@@ -135,7 +135,7 @@ Read the [program reference](./docs/PROGRAMS.md) for the complete schema.
 
 ## Architecture
 
-![NexcoreCtrlComputer desktop and browser control architecture](./assets/architecture-v032.svg)
+![NexcoreCtrlComputer desktop and browser control architecture](./assets/architecture-v033.svg)
 
 The surface router keeps desktop and browser state explicit. The local runtime
 owns bounded observation, target resolution, policy, action execution, and state

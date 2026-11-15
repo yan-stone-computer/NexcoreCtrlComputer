@@ -104,7 +104,7 @@ nexcore program run browser.fill '{"value":"Ada"}'
 
 ## 架构
 
-![NexcoreCtrlComputer 桌面与浏览器控制架构](./assets/architecture-v032.svg)
+![NexcoreCtrlComputer 桌面与浏览器控制架构](./assets/architecture-v033.svg)
 
 通道路由显式区分桌面和浏览器；本地运行时负责有界观察、逐级目标定位、安全策略、
 动作执行和状态证明。之前的浏览器会话不会偷偷接管后续的
