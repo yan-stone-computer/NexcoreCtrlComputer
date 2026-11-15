@@ -139,6 +139,9 @@ At replay time:
 
 Read the [program reference](./docs/PROGRAMS.md) for the complete schema.
 
+Black-box prompts and expected outcomes are in
+[docs/TEST-CASES.zh-CN.md](./docs/TEST-CASES.zh-CN.md).
+
 ## Architecture
 
 ![NexcoreCtrlComputer desktop and browser control architecture](./assets/architecture-v033.svg)

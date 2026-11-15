@@ -108,6 +108,9 @@ nexcore program run browser.fill '{"value":"Ada"}'
 
 完整规则见 [程序规范](./docs/PROGRAMS.md)。
 
+真实用户口吻的黑盒测试清单见
+[docs/TEST-CASES.zh-CN.md](./docs/TEST-CASES.zh-CN.md)。
+
 ## 架构
 
 ![NexcoreCtrlComputer 桌面与浏览器控制架构](./assets/architecture-v033.svg)
