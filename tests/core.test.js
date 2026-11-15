@@ -187,6 +187,51 @@ test("software inventory and adapter registry are separate from running apps", a
   assert.match(adapters.text, /libreoffice: available/);
 });
 
+test("focused text and key sequences use Windows-MCP input", async () => {
+  const computer = new Computer({ desktopBin: "unused", browserBin: "unused" });
+  let focusedText = "";
+  let sequence = [];
+  computer.windowsMcp = {
+    async typeAtFocus(text) {
+      focusedText = text;
+      return "pasted";
+    },
+    async pressSequence(keys) {
+      sequence = keys;
+      return "pressed";
+    }
+  };
+
+  const typed = await computer.act({ action: "type", text: "NexcoreWork focused input" });
+  const pressed = await computer.act({
+    action: "press",
+    keys: ["6", "4", "2", "*", "5", "3", "2", "="]
+  });
+
+  assert.equal(focusedText, "NexcoreWork focused input");
+  assert.deepEqual(sequence, ["6", "4", "2", "*", "5", "3", "2", "="]);
+  assert.equal(typed.receipt.route.strategy, "windows-mcp-focused-type");
+  assert.equal(pressed.receipt.route.strategy, "windows-mcp-key-sequence");
+});
+
+test("browser observation includes the active page title", async () => {
+  const computer = new Computer({ desktopBin: "unused", browserBin: "unused" });
+  computer._browser = async (args) => {
+    if (args[0] === "get" && args[1] === "title") {
+      return { data: { title: "Example Domain" }, elapsedMs: 1 };
+    }
+    return {
+      data: { snapshot: "- heading \"Example\"", refs: {}, url: "https://example.com/" },
+      elapsedMs: 1
+    };
+  };
+
+  const result = await computer.observe({ surface: "browser", open: false, delta: false });
+
+  assert.equal(result.title, "Example Domain");
+  assert.match(result.text, /title: Example Domain/);
+});
+
 test("Windows-MCP is the desktop fallback for observation, launch, and click", async () => {
   const computer = new Computer({ desktopBin: "unused", browserBin: "unused" });
   computer._desktop = async () => {

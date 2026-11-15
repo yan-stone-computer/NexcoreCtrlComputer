@@ -186,6 +186,20 @@ export class WindowsMcpBridge {
     return this.call("Shortcut", { shortcut: String(keys) });
   }
 
+  async pressSequence(keys) {
+    const results = [];
+    for (const raw of keys) {
+      const key = raw === "*" ? "shift+8" : raw === "=" ? "return" : String(raw);
+      results.push(await this.press(key));
+    }
+    return results.join("\n");
+  }
+
+  async typeAtFocus(text) {
+    await this.call("Clipboard", { mode: "set", text: String(text ?? "") });
+    return this.call("Shortcut", { shortcut: "ctrl+v" });
+  }
+
   async waitForText(text, timeoutMs = 5000) {
     return this.call("WaitFor", {
       condition: "text_exists",

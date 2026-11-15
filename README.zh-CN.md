@@ -110,6 +110,8 @@ nexcore program run browser.fill '{"value":"Ada"}'
 
 真实用户口吻的黑盒测试清单见
 [docs/TEST-CASES.zh-CN.md](./docs/TEST-CASES.zh-CN.md)。
+最新五轮 Windows 前台真机测试报告见
+[docs/LIVE-TEST-REPORT-2026-11-15.md](./docs/LIVE-TEST-REPORT-2026-11-15.md)。
 
 ## 架构
 

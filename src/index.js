@@ -134,6 +134,9 @@ const ACTION_ALIASES = Object.freeze({
   type_text: "type",
   key: "press",
   press_key: "press",
+  hotkey: "press",
+  shortcut: "press",
+  keyboard: "press",
   close_window: "close_app",
   focus_window: "window_focus",
   resize_window: "window_resize",
@@ -466,6 +469,13 @@ function targetMatches(entry, target) {
 
 function canUseWindowsMcpFallback(error) {
   return DESKTOP_FALLBACK_CODES.has(String(error?.code || ""));
+}
+
+function keySequence(value) {
+  if (Array.isArray(value)) return value.map(String);
+  const text = String(value ?? "");
+  if (/^[0-9.+\-*/=]+$/.test(text) && text.length > 1) return [...text];
+  return null;
 }
 
 function controlReceipt(operation, {
@@ -1346,6 +1356,9 @@ export class Computer {
       if (input.depth) args.push("-d", String(Math.max(1, Math.min(50, input.depth))));
       if (input.selector) args.push("-s", input.selector);
       const response = await this._browser(args);
+      const titleResponse = await this._browser(["get", "title"]).catch(() => null);
+      const pageTitle = titleResponse?.data?.title
+        ?? (typeof titleResponse?.data === "string" ? titleResponse.data : "");
       const compact = compactBrowserSnapshot(response.data, { maxChars: input.maxChars ?? this.config.maxChars });
       const filtered = input.query
         ? compact.text
@@ -1354,12 +1367,14 @@ export class Computer {
             .join("\n") || "(no matching elements)"
         : compact.text;
       const url = response.data.url ? `\nurl: ${response.data.url}` : "";
-      const body = `browser\n${filtered}${url}`;
+      const title = pageTitle ? `\ntitle: ${pageTitle}` : "";
+      const body = `browser\n${filtered}${title}${url}`;
       const remembered = this._remember(key, body);
       const output = delta && remembered.previous ? diffLines(remembered.previous.text, body) : body;
       result = {
         surface,
         url: response.data.url || input.url,
+        title: pageTitle || undefined,
         revision: remembered.revision,
         complete: true,
         text: output,
@@ -1680,6 +1695,31 @@ export class Computer {
         });
       }
       return this._clipboardAction(input, action);
+    }
+
+    if (surface === "desktop" && ["fill", "type"].includes(action) && !input.target) {
+      const value = String(input.text ?? input.value ?? "");
+      const typed = await this.windowsMcp.typeAtFocus(value);
+      return actionResult("desktop", action, {
+        success: true,
+        text: typed,
+        disposition: { delivery: "delivered_unverified", retry: "unsafe" }
+      }, {
+        strategy: "windows-mcp-focused-type"
+      });
+    }
+    if (surface === "desktop" && action === "press") {
+      const sequence = keySequence(input.keys);
+      if (sequence) {
+        const pressed = await this.windowsMcp.pressSequence(sequence);
+        return actionResult("desktop", action, {
+          success: true,
+          text: pressed,
+          disposition: { delivery: "delivered_unverified", retry: "unsafe" }
+        }, {
+          strategy: "windows-mcp-key-sequence"
+        });
+      }
     }
 
     let ref = null;

@@ -141,6 +141,8 @@ Read the [program reference](./docs/PROGRAMS.md) for the complete schema.
 
 Black-box prompts and expected outcomes are in
 [docs/TEST-CASES.zh-CN.md](./docs/TEST-CASES.zh-CN.md).
+The latest five-round Windows UI test report is in
+[docs/LIVE-TEST-REPORT-2026-11-15.md](./docs/LIVE-TEST-REPORT-2026-11-15.md).
 
 ## Architecture
 
