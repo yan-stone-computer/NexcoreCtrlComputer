@@ -1,12 +1,12 @@
 <p align="center">
-  <img src="./assets/hero.svg" alt="NexcoreCtrlComputer: compile once, replay across desktop and browser" width="100%">
+  <img src="./assets/hero-v030.svg" alt="NexcoreCtrlComputer 0.3.0 desktop and browser control flow" width="100%">
 </p>
 
 <h1 align="center">NexcoreCtrlComputer</h1>
 
 <p align="center">
-  <strong>Compile once. Reuse across desktop and browser.</strong><br>
-  Semantic UI programs with local target resolution and verified replay.
+  <strong>Observe. Act. Prove what changed.</strong><br>
+  One accessibility-first control kernel for native desktop apps and browser sessions.
 </p>
 
 <p align="center">
@@ -17,17 +17,42 @@
   <img alt="license" src="https://img.shields.io/badge/license-MIT-2563eb">
 </p>
 
-> Your agent does not need a 4K screenshot to click a button called "Save".
+> Your agent does not need a 4K screenshot to click a button called **Save**.
 
-Most computer-use stacks send pixels, coordinates, and the same multi-step plan
-back and forth until the token bill becomes the product. NexcoreCtrlComputer
-introduces a new primitive: a parameterized semantic UI program. Compile a
-cross-surface workflow once, then let the local runtime resolve fresh targets,
-execute, verify, and return one compact outcome.
+NexcoreCtrlComputer is the open-source control kernel behind NexcoreWork. It
+exposes one JS/CLI/MCP contract for desktop and browser control, resolves
+accessibility targets locally, verifies important postconditions, and returns a
+compact receipt instead of dumping screenshots and raw UI trees into the model.
 
-It is built on **agent-desktop**, **agent-browser**, and an explicitly gated
-**PyAutoGUI** fallback, but the durable asset is your program, not a screenshot
-or an agent prompt.
+The durable unit can be a one-off semantic action or a parameterized UI program.
+The kernel is built on **agent-desktop**, **agent-browser**, and an explicitly
+gated PyAutoGUI fallback. It is not a standalone desktop app.
+
+## What changed in 0.3.0
+
+`0.3.0` fixes the failure mode where an open browser session hijacked later
+desktop work:
+
+- `observe` now supports desktop inventory views: `windows`, `apps`, `displays`,
+  `notifications`, and `surfaces`.
+- Inventory views always return to the desktop route, even after a browser task.
+- Window focus restores minimized windows and retries transient foreground-lock
+  failures.
+- Window management and clipboard actions are part of the same action contract.
+- `property=text` reads actual accessible text instead of treating existence as
+  a text match.
+- Every action can return route, delivery, retry, and verification evidence.
+
+The Windows live test used in this repository opens the real Calculator,
+observes its accessible controls, clicks the `七` button, and verifies the text
+`显示为 7`.
+
+```text
+route:  desktop / windows / provided-ref
+action: click button "七"
+proof:  text = "显示为 7"
+result: delivered_verified
+```
 
 ## Why this exists
 
@@ -100,10 +125,22 @@ Read the [program reference](./docs/PROGRAMS.md) for the complete schema.
 
 ## Architecture
 
-![NexcoreCtrlComputer semantic program architecture](./assets/architecture.svg)
+![NexcoreCtrlComputer 0.3.0 control architecture](./assets/architecture-v030.svg)
 
-The model submits intent; the local runtime owns the durable program, target
-resolution ladder, policy, action execution, and state proof.
+The surface router keeps desktop and browser state explicit. The local runtime
+owns bounded observation, target resolution, policy, action execution, and state
+proof. A previous browser session cannot silently capture a later
+`observe({ view: "windows" })` call.
+
+## Which observation should I use?
+
+| Goal | Call |
+|---|---|
+| Find an open desktop window | `observe({ view: "windows" })` |
+| List running desktop applications | `observe({ view: "apps" })` |
+| Inspect Calculator controls | `observe({ app: "CalculatorApp.exe", query: "7" })` |
+| Continue working in the active page | `observe({ surface: "browser" })` |
+| Open a URL and inspect it | `observe({ surface: "browser", url: "https://..." })` |
 
 ## 30-second demo
 
@@ -116,6 +153,8 @@ npm install -g agent-desktop agent-browser
 python -m pip install pyautogui                          # optional fallback
 nexcore doctor
 
+nexcore observe '{"view":"windows"}'
+nexcore observe '{"view":"apps"}'
 nexcore observe '{"surface":"desktop","app":"Calculator","query":"7"}'
 nexcore act '{"surface":"desktop","app":"Calculator","action":"click","target":{"role":"button","name":"7"}}'
 ```
@@ -352,6 +391,8 @@ Validated on Windows with Node 24, `agent-desktop` 1.2.0,
 - live browser click and URL verification
 - live parameterized browser program save and verified replay
 - live cross-surface program spanning a Chromium page and a native app
+- browser-to-desktop inventory switching without session leakage
+- real Calculator launch, semantic button click, and accessible-text verification
 - MCP protocol smoke test
 - unit tests for compiler, storage, contextual resolution, and policies
 

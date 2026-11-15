@@ -1,24 +1,38 @@
 <p align="center">
-  <img src="./assets/hero.svg" alt="NexcoreCtrlComputer" width="100%">
+  <img src="./assets/hero-v030.svg" alt="NexcoreCtrlComputer 0.3.0 桌面与浏览器控制流程" width="100%">
 </p>
 
 <h1 align="center">NexcoreCtrlComputer</h1>
 
 <p align="center">
-  <strong>编译一次，跨桌面和浏览器复用。</strong><br>
-  语义 UI 程序、本地精确寻址、可验证重放。
+  <strong>观察、执行，并证明界面真的变了。</strong><br>
+  一个面向原生桌面和浏览器会话的无障碍优先控制内核。
 </p>
 
 > Agent 不需要一张 4K 截图，才能点击一个叫“保存”的按钮。
 
-很多电脑操控框架每次都把截图、坐标和同一套多步计划重新发给模型，延迟高、
-token 贵，窗口变化还会点错。NexcoreCtrlComputer 引入了新的核心抽象：可参数化
-的语义 UI 程序。跨端流程只编译一次，之后由本地运行时重新寻址、执行和验证，
-模型只收到一个紧凑结果。
+NexcoreCtrlComputer 是 NexcoreWork 使用的开源电脑控制内核。它用统一的
+JS/CLI/MCP 契约控制桌面和浏览器，在本地完成无障碍目标定位，验证关键后置条件，
+并返回紧凑回执，而不是把截图和完整控件树反复发给模型。
 
-底层能力来自 **agent-desktop**、**agent-browser** 和显式开启的
-**PyAutoGUI** 兜底；真正沉淀下来的资产是你的程序和状态契约，而不是截图或
-一次性 prompt。
+它既可以执行一次语义动作，也可以保存参数化 UI 程序。底层使用
+**agent-desktop**、**agent-browser** 和显式开启的 PyAutoGUI 兜底；它不是
+一个独立的桌面软件。
+
+## 0.3.0 修了什么
+
+`0.3.0` 修复了网页会话“粘住”，导致后续桌面操作仍然跑进浏览器的问题：
+
+- `observe` 支持 `windows`、`apps`、`displays`、`notifications`、`surfaces`
+  五种桌面清单视图。
+- 桌面清单始终回到桌面通道，不受之前的浏览器任务影响。
+- 窗口聚焦会恢复最小化窗口，并在 Windows 前台锁拦截时重试。
+- 窗口管理和剪贴板读写进入统一动作契约。
+- `property=text` 读取真实无障碍文本，不再把“元素存在”冒充文本验证。
+- 每个动作都能返回路由、投递、重试和验证回执。
+
+本仓库的 Windows 真机测试会打开系统计算器、观察无障碍控件、点击“七”按钮，
+并验证显示文字为“显示为 7”。
 
 ## 为什么值得用
 
@@ -83,10 +97,21 @@ nexcore program run browser.fill '{"value":"Ada"}'
 
 ## 架构
 
-![NexcoreCtrlComputer 语义程序架构](./assets/architecture.svg)
+![NexcoreCtrlComputer 0.3.0 控制架构](./assets/architecture-v030.svg)
 
-模型只提交意图；本地运行时负责持久化程序、逐级目标定位、安全策略、动作执行和
-状态证明。
+通道路由显式区分桌面和浏览器；本地运行时负责有界观察、逐级目标定位、安全策略、
+动作执行和状态证明。之前的浏览器会话不会偷偷接管后续的
+`observe({ view: "windows" })`。
+
+## 该用哪个观察接口？
+
+| 目标 | 调用 |
+|---|---|
+| 查找已打开的桌面窗口 | `observe({ view: "windows" })` |
+| 列出正在运行的桌面应用 | `observe({ view: "apps" })` |
+| 查看计算器控件 | `observe({ app: "CalculatorApp.exe", query: "7" })` |
+| 继续操作当前网页 | `observe({ surface: "browser" })` |
+| 打开网页并观察 | `observe({ surface: "browser", url: "https://..." })` |
 
 ## 三步跑起来
 
@@ -103,6 +128,8 @@ nexcore doctor
 桌面观察：
 
 ```bash
+nexcore observe '{"view":"windows"}'
+nexcore observe '{"view":"apps"}'
 nexcore observe '{"surface":"desktop","app":"Calculator","query":"7"}'
 ```
 
