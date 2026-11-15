@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ProgramRuntime, ProgramStore } from "./programs.js";
+import { WindowsMcpBridge } from "./windows-mcp.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PY_BRIDGE = join(HERE, "..", "scripts", "pyautogui_bridge.py");
@@ -25,6 +26,15 @@ const WINDOW_ACTIONS = new Set([
   "window_restore"
 ]);
 const CLIPBOARD_FORMATS = new Set(["text", "auto", "image", "file-urls"]);
+const DESKTOP_FALLBACK_CODES = new Set([
+  "BACKEND_ERROR",
+  "BACKEND_MISSING",
+  "BRIDGE_MISSING",
+  "PROCESS_ERROR",
+  "TIMEOUT",
+  "INVALID_OUTPUT",
+  "ACTION_NOT_SUPPORTED"
+]);
 const ACTION_ALIASES = Object.freeze({
   open_app: "open",
   launch_app: "open",
@@ -367,6 +377,10 @@ function targetMatches(entry, target) {
   return roleOk && nameOk;
 }
 
+function canUseWindowsMcpFallback(error) {
+  return DESKTOP_FALLBACK_CODES.has(String(error?.code || ""));
+}
+
 function controlReceipt(operation, {
   surface,
   engine,
@@ -442,6 +456,7 @@ export class Computer {
       : new ActionPolicy(options.policy || options);
     this.programStore = new ProgramStore({ directory: options.programDir });
     this.programRuntime = new ProgramRuntime(this, this.programStore);
+    this.windowsMcp = new WindowsMcpBridge(options.windowsMcp || {});
     this.previous = new Map();
     this.activeSurface = "desktop";
     this.closed = false;
@@ -490,13 +505,14 @@ export class Computer {
         return { name, ok: false, code: error.code, message: error.message, details: error.details };
       }
     };
-    const [desktop, browser, pyautogui] = await Promise.all([
+    const [desktop, browser, pyautogui, windowsMcp] = await Promise.all([
       probe("desktop", this.config.desktopBin, ["status"]),
       probe("browser", this.config.browserBin, ["--json", "doctor"]),
       this._pyautogui({ action: "status" }).then(
         (data) => ({ name: "pyautogui", ok: true, data }),
         (error) => ({ name: "pyautogui", ok: false, code: error.code, message: error.message })
-      )
+      ),
+      this.windowsMcp.probe()
     ]);
     const desktopSummary = desktop.ok ? {
       ok: true,
@@ -518,7 +534,7 @@ export class Computer {
       elapsedMs: browser.elapsedMs
     } : browser;
     return {
-      ok: desktop.ok && browser.ok,
+      ok: (desktop.ok || windowsMcp.ok) && browser.ok,
       kernel: {
         schema: RECEIPT_SCHEMA,
         pipeline: ["observe", "resolve", "act", "verify", "receipt"],
@@ -545,6 +561,11 @@ export class Computer {
           route: "browser",
           state: browserSummary.ok ? "ready" : "unavailable",
           detail: browserSummary
+        },
+        {
+          route: "windows-mcp",
+          state: windowsMcp.ok ? "ready" : "unavailable",
+          detail: windowsMcp
         },
         {
           route: "coordinate-fallback",
@@ -690,6 +711,43 @@ export class Computer {
         retry: "safe",
         verified: true,
         revision: remembered.revision
+      })
+    };
+  }
+
+  async _windowsMcpObserve(input) {
+    const view = String(input.view || "semantic");
+    const snapshot = await this.windowsMcp.snapshot({
+      useUiTree: true,
+      useVision: false
+    });
+    const maxChars = input.maxChars ?? this.config.maxChars;
+    const text = snapshot.text.length > maxChars
+      ? `${snapshot.text.slice(0, maxChars - 20)}\n… output capped`
+      : snapshot.text;
+    const key = ["windows-mcp", this.config.session, view, input.query || "", input.maxItems || ""].join(":");
+    const remembered = this._remember(key, text);
+    const output = input.delta !== false && remembered.previous
+      ? diffLines(remembered.previous.text, text)
+      : text;
+    return {
+      surface: "desktop",
+      view,
+      count: snapshot.elements.length,
+      total: snapshot.elements.length,
+      complete: false,
+      text: output,
+      refs: snapshot.elements,
+      revision: remembered.revision,
+      receipt: controlReceipt("observe", {
+        surface: "desktop",
+        engine: "windows-mcp",
+        strategy: `${view}-fallback`,
+        delivery: "observed",
+        retry: "safe",
+        verified: true,
+        revision: remembered.revision,
+        complete: false
       })
     };
   }
@@ -963,10 +1021,22 @@ export class Computer {
       };
     }
     if (surface === "desktop" && input.view) {
-      const viewed = await this._desktopView(input);
-      viewed.bytes = Buffer.byteLength(viewed.text, "utf8");
-      viewed.estimatedTokens = estimateTokens(viewed.text);
-      return viewed;
+      try {
+        const viewed = await this._desktopView(input);
+        viewed.bytes = Buffer.byteLength(viewed.text, "utf8");
+        viewed.estimatedTokens = estimateTokens(viewed.text);
+        return viewed;
+      } catch (error) {
+        if (!canUseWindowsMcpFallback(error)) throw error;
+        try {
+          const viewed = await this._windowsMcpObserve(input);
+          viewed.bytes = Buffer.byteLength(viewed.text, "utf8");
+          viewed.estimatedTokens = estimateTokens(viewed.text);
+          return viewed;
+        } catch {
+          throw error;
+        }
+      }
     }
     const delta = input.delta !== false;
     const key = [
@@ -991,7 +1061,16 @@ export class Computer {
       args.push("--interactive-only", "--compact");
       if (input.depth) args.push("--max-depth", String(Math.max(1, Math.min(50, input.depth))));
       if (input.includeBounds) args.push("--include-bounds");
-      const response = await this._desktop(args);
+      let response;
+      try {
+        response = await this._desktop(args);
+      } catch (error) {
+        if (!canUseWindowsMcpFallback(error)) throw error;
+        return this._windowsMcpObserve({
+          ...input,
+          view: input.view || "semantic"
+        });
+      }
       const compact = compactDesktopSnapshot(response.data, {
         maxNodes: input.maxNodes ?? this.config.maxNodes,
         maxChars: input.maxChars ?? this.config.maxChars,
@@ -1178,6 +1257,58 @@ export class Computer {
     return (await this._resolveTargetDetailed(input, surface)).ref;
   }
 
+  async _windowsMcpAction(input, action, ref) {
+    if (action === "press") {
+      const text = await this.windowsMcp.press(input.keys);
+      return actionResult("desktop", action, {
+        success: true,
+        text,
+        disposition: { delivery: "delivered", retry: "unsafe" }
+      }, { ref, strategy: "windows-mcp-shortcut" });
+    }
+    const element = Number.isFinite(input.target?.x) && Number.isFinite(input.target?.y)
+      ? { x: input.target.x, y: input.target.y }
+      : this.windowsMcp.element(ref);
+    if (!element) {
+      throw new NexcoreError("TARGET_NOT_FOUND", `Windows-MCP element is no longer available: ${ref}`, {
+        retry: "safe"
+      });
+    }
+    let text;
+    let strategy = "windows-mcp-click";
+    if (action === "click" || action === "check" || action === "uncheck" || action === "toggle"
+      || action === "expand" || action === "collapse" || action === "focus" || action === "select") {
+      text = await this.windowsMcp.click(element, 1);
+    } else if (action === "double_click") {
+      text = await this.windowsMcp.click(element, 2);
+    } else if (action === "right_click") {
+      text = await this.windowsMcp.call("Click", {
+        loc: [element.x, element.y],
+        button: "right",
+        clicks: 1
+      });
+    } else if (action === "hover") {
+      text = await this.windowsMcp.click(element, 0);
+    } else if (action === "fill" || action === "type") {
+      text = await this.windowsMcp.type(element, input.text ?? input.value ?? "", {
+        clear: action === "fill"
+      });
+      strategy = "windows-mcp-type";
+    } else if (action === "scroll") {
+      text = await this.windowsMcp.scroll(element, input.direction || "down", input.amount || 3);
+      strategy = "windows-mcp-scroll";
+    } else {
+      throw new NexcoreError("ACTION_NOT_SUPPORTED", `Windows-MCP fallback does not support ${action}.`, {
+        retry: "safe"
+      });
+    }
+    return actionResult("desktop", action, {
+      success: true,
+      text,
+      disposition: { delivery: "delivered", retry: "unsafe" }
+    }, { ref, strategy });
+  }
+
   async act(input = {}) {
     this._ensureOpen();
     const surface = this._surface(input);
@@ -1235,20 +1366,36 @@ export class Computer {
       if (!input.app) throw new NexcoreError("APP_REQUIRED", "Desktop open needs app.", { retry: "safe" });
       const requestedTimeout = Number(input.timeoutMs);
       const launchTimeout = Number.isFinite(requestedTimeout) && requestedTimeout > 0 ? requestedTimeout : 10000;
-      const response = await this._desktop([
-        "launch",
-        input.app,
-        "--timeout",
-        String(Math.min(launchTimeout, this.config.timeoutMs))
-      ], { headed: input.headed });
+      let response;
+      let launchEngine = "windows";
+      try {
+        response = await this._desktop([
+          "launch",
+          input.app,
+          "--timeout",
+          String(Math.min(launchTimeout, this.config.timeoutMs))
+        ], { headed: input.headed });
+      } catch (error) {
+        if (!canUseWindowsMcpFallback(error)) throw error;
+        const text = await this.windowsMcp.launch(input.app, input.app);
+        launchEngine = "windows-mcp";
+        response = {
+          data: {
+            success: true,
+            text,
+            disposition: { delivery: "delivered_unverified", retry: "unsafe" }
+          },
+          elapsedMs: 0
+        };
+      }
       return {
         ...actionResult("desktop", action, response.data, { elapsedMs: response.elapsedMs }),
         delivery: "delivered_unverified",
         window: "unverified",
         receipt: controlReceipt("act", {
           surface: "desktop",
-          engine: "windows",
-          strategy: "process-launch",
+          engine: launchEngine,
+          strategy: launchEngine === "windows-mcp" ? "app-launch-fallback" : "process-launch",
           delivery: "delivered_unverified",
           retry: "unsafe"
         })
@@ -1312,6 +1459,17 @@ export class Computer {
     const timeoutArgs = input.timeoutMs ? ["--timeout-ms", String(input.timeoutMs)] : [];
 
     if (surface === "desktop") {
+      if (String(ref || "").startsWith("@wmcp:")) {
+        const result = await this._windowsMcpAction(input, action, ref);
+        if (input.expect) {
+          const expectation = { ...input.expect, surface, ref };
+          result.verification = await this.verify(expectation);
+          if (result.verification?.ok) result.delivery = "delivered_verified";
+          result.receipt.effect.delivery = result.delivery;
+          result.receipt.evidence.verified = Boolean(result.verification?.ok);
+        }
+        return result;
+      }
       const desktopMap = {
         click: ["click", ref],
         double_click: ["double-click", ref],
@@ -1411,6 +1569,32 @@ export class Computer {
     );
 
     if (surface === "desktop") {
+      if (String(ref || "").startsWith("@wmcp:")) {
+        const needle = expected || expect.target?.name || "";
+        try {
+          const text = await this.windowsMcp.waitForText(needle, timeoutMs);
+          return {
+            ok: true,
+            ref,
+            property,
+            expected: needle,
+            observed: { text },
+            receipt: controlReceipt("verify", {
+              surface,
+              engine: "windows-mcp",
+              strategy: "wait-for-text",
+              delivery: "verified",
+              retry: "safe",
+              verified: true
+            })
+          };
+        } catch (error) {
+          throw new NexcoreError("VERIFY_TIMEOUT", `Expected ${property}=${needle}; Windows-MCP did not observe it.`, {
+            details: { ref, cause: error instanceof Error ? error.message : String(error) },
+            retry: "unsafe"
+          });
+        }
+      }
       if (property === "text" || property === "title") {
         const deadline = Date.now() + timeoutMs;
         let last;
@@ -1578,6 +1762,7 @@ export class Computer {
     if (this.closed) return;
     this.closed = true;
     await Promise.allSettled([
+      this.windowsMcp.close(),
       this._run(this.config.browserBin, ["--json", "--session", this.config.session, "close"], { timeoutMs: 5000 })
     ]);
   }

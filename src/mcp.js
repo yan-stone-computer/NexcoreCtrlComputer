@@ -2,7 +2,7 @@
 import { createInterface } from "node:readline";
 import { createComputer } from "./index.js";
 
-const VERSION = "0.3.0";
+const VERSION = "0.4.0";
 
 const tool = {
   name: "computer",

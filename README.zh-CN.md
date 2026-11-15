@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./assets/hero-v030.svg" alt="NexcoreCtrlComputer 0.3.0 桌面与浏览器控制流程" width="100%">
+  <img src="./assets/hero-v040.svg" alt="NexcoreCtrlComputer 0.4.0 桌面与浏览器控制流程" width="100%">
 </p>
 
 <h1 align="center">NexcoreCtrlComputer</h1>
@@ -19,7 +19,14 @@ JS/CLI/MCP 契约控制桌面和浏览器，在本地完成无障碍目标定位
 **agent-desktop**、**agent-browser** 和显式开启的 PyAutoGUI 兜底；它不是
 一个独立的桌面软件。
 
-## 0.3.0 修了什么
+## 0.4.0 增加了什么
+
+`0.4.0` 在保留 `agent-desktop` 语义核心的同时，增加 Windows 分层回退：
+
+- 主桌面后端不可用时，可由 `Windows-MCP` 启动应用、抓取桌面/窗口状态、
+  解析控件标签、模拟输入并等待文本。
+- 回退仍走同一个 JS/CLI/MCP 契约，并返回相同的路由、投递和验证回执。
+- `0.3.0` 的“浏览器状态不能劫持桌面清单”修复继续生效。
 
 `0.3.0` 修复了网页会话“粘住”，导致后续桌面操作仍然跑进浏览器的问题：
 
@@ -97,7 +104,7 @@ nexcore program run browser.fill '{"value":"Ada"}'
 
 ## 架构
 
-![NexcoreCtrlComputer 0.3.0 控制架构](./assets/architecture-v030.svg)
+![NexcoreCtrlComputer 桌面与浏览器控制架构](./assets/architecture-v032.svg)
 
 通道路由显式区分桌面和浏览器；本地运行时负责有界观察、逐级目标定位、安全策略、
 动作执行和状态证明。之前的浏览器会话不会偷偷接管后续的

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0 - 2026-11-15
+
+- Added optional Windows-MCP fallback for application launch, desktop snapshots, labels, input, and text waits.
+- Added a layered backend order: agent-desktop first, Windows-MCP second, guarded PyAutoGUI last.
+- Added desktop fallback tests and refreshed the architecture figure in a plain scientific style.
+
 ## 0.3.0 - 2026-11-15
 
 - Added desktop inventory views for windows, apps, displays, notifications, and surfaces.

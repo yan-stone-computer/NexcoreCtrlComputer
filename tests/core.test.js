@@ -166,6 +166,40 @@ test("desktop inventory views escape a previous browser session", async () => {
   assert.deepEqual(calls.slice(1).map((args) => args[1]), ["list-apps", "list-windows"]);
 });
 
+test("Windows-MCP is the desktop fallback for observation, launch, and click", async () => {
+  const computer = new Computer({ desktopBin: "unused", browserBin: "unused" });
+  computer._desktop = async () => {
+    throw Object.assign(new Error("agent-desktop unavailable"), { code: "BACKEND_ERROR" });
+  };
+  computer.windowsMcp = {
+    async snapshot() {
+      return {
+        text: 'Opened Windows:\\n计算器   Normal  502  810  123',
+        elements: [{ ref: "@wmcp:0", x: 116, y: 660, role: "按钮", name: "七" }]
+      };
+    },
+    async launch() {
+      return '{"pid":123}';
+    },
+    async element(ref) {
+      return ref === "@wmcp:0" ? { x: 116, y: 660, role: "按钮", name: "七" } : null;
+    },
+    async click() {
+      return "Single left clicked at (116,660).";
+    }
+  };
+
+  const observed = await computer.observe({ view: "windows", delta: false });
+  const opened = await computer.act({ action: "open_app", app: "Calculator" });
+  const clicked = await computer.act({ action: "click", target: "@wmcp:0" });
+
+  assert.equal(observed.surface, "desktop");
+  assert.equal(observed.receipt.route.engine, "windows-mcp");
+  assert.equal(observed.refs[0].ref, "@wmcp:0");
+  assert.equal(opened.receipt.route.engine, "windows-mcp");
+  assert.equal(clicked.receipt.route.strategy, "windows-mcp-click");
+});
+
 test("browser contextual targets fail closed instead of dropping context", async () => {
   const computer = new Computer({ desktopBin: "unused" });
   await assert.rejects(

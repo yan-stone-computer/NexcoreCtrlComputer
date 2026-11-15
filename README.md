@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./assets/hero-v030.svg" alt="NexcoreCtrlComputer 0.3.0 desktop and browser control flow" width="100%">
+  <img src="./assets/hero-v040.svg" alt="NexcoreCtrlComputer 0.4.0 desktop and browser control flow" width="100%">
 </p>
 
 <h1 align="center">NexcoreCtrlComputer</h1>
@@ -11,7 +11,7 @@
 
 <p align="center">
   <a href="https://github.com/yan-stone-computer/NexcoreCtrlComputer/actions/workflows/ci.yml"><img alt="ci" src="https://github.com/yan-stone-computer/NexcoreCtrlComputer/actions/workflows/ci.yml/badge.svg"></a>
-  <img alt="status" src="https://img.shields.io/badge/status-v0.3%20alpha-f59e0b">
+  <img alt="status" src="https://img.shields.io/badge/status-v0.4%20alpha-f59e0b">
   <img alt="node" src="https://img.shields.io/badge/node-%3E%3D20-339933">
   <img alt="runtime dependencies" src="https://img.shields.io/badge/runtime%20deps-0-16a34a">
   <img alt="license" src="https://img.shields.io/badge/license-MIT-2563eb">
@@ -28,9 +28,19 @@ The durable unit can be a one-off semantic action or a parameterized UI program.
 The kernel is built on **agent-desktop**, **agent-browser**, and an explicitly
 gated PyAutoGUI fallback. It is not a standalone desktop app.
 
-## What changed in 0.3.0
+## What changed in 0.4.0
 
-`0.3.0` fixes the failure mode where an open browser session hijacked later
+`0.4.0` adds a layered Windows fallback path while keeping `agent-desktop` as
+the semantic desktop core:
+
+- `Windows-MCP` can launch applications, capture desktop/window state, resolve
+  labels, synthesize input, and wait for text when the primary desktop backend
+  is unavailable.
+- Desktop fallback remains behind the same CLI/JS/MCP contract and returns the
+  same route/delivery/verification evidence.
+- The browser-to-desktop routing fix from `0.3.0` remains enforced.
+
+`0.3.0` fixed the failure mode where an open browser session hijacked later
 desktop work:
 
 - `observe` now supports desktop inventory views: `windows`, `apps`, `displays`,
@@ -125,7 +135,7 @@ Read the [program reference](./docs/PROGRAMS.md) for the complete schema.
 
 ## Architecture
 
-![NexcoreCtrlComputer 0.3.0 control architecture](./assets/architecture-v030.svg)
+![NexcoreCtrlComputer desktop and browser control architecture](./assets/architecture-v032.svg)
 
 The surface router keeps desktop and browser state explicit. The local runtime
 owns bounded observation, target resolution, policy, action execution, and state

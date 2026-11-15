@@ -1,6 +1,6 @@
 {
   "name": "nexcorectrlcomputer",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Accessibility-first control plane for computer-use agents. One tool, lower token cost, verified actions.",
   "type": "module",
   "license": "MIT",
@@ -46,10 +46,14 @@
     "node": ">=20"
   },
   "peerDependencies": {
+    "@modelcontextprotocol/sdk": ">=1.32.0 <2",
     "agent-browser": ">=0.42.0",
     "agent-desktop": ">=1.2.0"
   },
   "peerDependenciesMeta": {
+    "@modelcontextprotocol/sdk": {
+      "optional": true
+    },
     "agent-browser": {
       "optional": true
     },
