@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.1 - 2026-11-15
+
+- Added installed Start Menu software inventory with exact launch names and AUMIDs.
+- Kept installed software separate from the running-app view.
+- Added a software adapter registry for desktop, browser, vision, workflow, and CLI engines.
+- Added per-software launch and control adapter hints.
+
 ## 0.4.0 - 2026-11-15
 
 - Added optional Windows-MCP fallback for application launch, desktop snapshots, labels, input, and text waits.

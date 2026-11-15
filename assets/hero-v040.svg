@@ -31,7 +31,7 @@
     <text x="64" y="74" fill="#F1FCFF" font-size="42" font-weight="730">NexcoreCtrlComputer</text>
     <text x="66" y="110" fill="#8BE9FA" font-size="18" font-weight="520">One control kernel for real desktop and browser work.</text>
     <rect x="1037" y="44" width="99" height="34" rx="17" fill="#0F2A25" stroke="#66F7C6" stroke-opacity="0.55"/>
-    <text x="1056" y="66" fill="#8DFFD4" font-size="13" font-weight="720">v0.4.0 LIVE</text>
+    <text x="1056" y="66" fill="#8DFFD4" font-size="13" font-weight="720">v0.4.1 LIVE</text>
   </g>
 
   <rect x="58" y="150" width="202" height="122" rx="20" fill="#0B2033" stroke="#45D8FF" stroke-opacity="0.52"/>

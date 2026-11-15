@@ -2,13 +2,13 @@
 import { createInterface } from "node:readline";
 import { createComputer } from "./index.js";
 
-const VERSION = "0.4.0";
+const VERSION = "0.4.1";
 
 const tool = {
   name: "computer",
   title: "Control this computer",
   description:
-    "Observe and control desktop or browser UI through accessibility refs. Desktop inventory views include windows, apps, displays, notifications, and surfaces. Prefer observe -> act -> verify; use screenshots only when structure is insufficient. One tool handles status, observe, act, batched runs, and close.",
+    "Observe and control desktop or browser UI through accessibility refs. Use software to list installed Start Menu applications, adapters to inspect available control engines and CLI adapters, and apps only for running applications. Desktop inventory views also include windows, displays, notifications, and surfaces. Prefer observe -> act -> verify; use screenshots only when structure is insufficient. One tool handles status, observe, act, batched runs, and close.",
   inputSchema: {
     type: "object",
     properties: {

@@ -26,6 +26,93 @@ const WINDOW_ACTIONS = new Set([
   "window_restore"
 ]);
 const CLIPBOARD_FORMATS = new Set(["text", "auto", "image", "file-urls"]);
+const SOFTWARE_PROJECTS = Object.freeze([
+  {
+    id: "agent-desktop",
+    role: "primary desktop semantics",
+    kind: "bundled",
+    license: "Apache-2.0",
+    project: "https://github.com/vercel-labs/agent-desktop"
+  },
+  {
+    id: "windows-mcp",
+    role: "Windows fallback and system automation",
+    kind: "mcp",
+    license: "MIT",
+    project: "https://github.com/CursorTouch/Windows-MCP"
+  },
+  {
+    id: "agent-browser",
+    role: "browser semantic control",
+    kind: "bundled",
+    license: "Apache-2.0",
+    project: "https://github.com/vercel-labs/agent-browser"
+  },
+  {
+    id: "playwright-mcp",
+    role: "browser MCP alternative",
+    kind: "optional-mcp",
+    license: "Apache-2.0",
+    project: "https://github.com/microsoft/playwright-mcp"
+  },
+  {
+    id: "omniparser",
+    role: "visual grounding fallback",
+    kind: "optional-vision",
+    license: "CC-BY-4.0",
+    project: "https://github.com/microsoft/OmniParser"
+  },
+  {
+    id: "openadapt",
+    role: "record and replay workflows",
+    kind: "optional-workflow",
+    license: "MIT",
+    project: "https://github.com/OpenAdaptAI/OpenAdapt"
+  },
+  {
+    id: "pywinauto",
+    role: "Python Windows UI Automation",
+    kind: "optional-library",
+    license: "BSD-3-Clause",
+    project: "https://github.com/pywinauto/pywinauto"
+  },
+  {
+    id: "flaui",
+    role: ".NET Windows UI Automation",
+    kind: "optional-library",
+    license: "MIT",
+    project: "https://github.com/FlaUI/FlaUI"
+  },
+  {
+    id: "ui-tars-desktop",
+    role: "external multimodal agent stack",
+    kind: "optional-agent",
+    license: "Apache-2.0",
+    project: "https://github.com/bytedance/UI-TARS-desktop"
+  },
+  {
+    id: "agent-s",
+    role: "external computer-use agent",
+    kind: "optional-agent",
+    license: "Apache-2.0",
+    project: "https://github.com/simular-ai/Agent-S"
+  },
+  {
+    id: "ufo",
+    role: "Microsoft Windows agent research stack",
+    kind: "optional-agent",
+    license: "MIT",
+    project: "https://github.com/microsoft/UFO"
+  }
+]);
+const CLI_ADAPTERS = Object.freeze([
+  { id: "libreoffice", command: "soffice", operations: ["convert", "headless", "print"] },
+  { id: "ffmpeg", command: "ffmpeg", operations: ["transcode", "extract-audio", "frames"] },
+  { id: "7zip", command: "7z", operations: ["compress", "extract", "list"] },
+  { id: "pandoc", command: "pandoc", operations: ["convert-documents", "markdown"] },
+  { id: "imagemagick", command: "magick", operations: ["convert-images", "resize", "compose"] },
+  { id: "git", command: "git", operations: ["repository", "diff", "commit"] }
+]);
 const DESKTOP_FALLBACK_CODES = new Set([
   "BACKEND_ERROR",
   "BACKEND_MISSING",
@@ -541,7 +628,7 @@ export class Computer {
         policy: "semantic-first"
       },
       capabilities: {
-        observe: ["semantic", "windows", "displays", "apps", "notifications", "surfaces", "browser"],
+        observe: ["software", "adapters", "semantic", "windows", "displays", "apps", "notifications", "surfaces", "browser"],
         act: [
           "open", "click", "double_click", "right_click", "hover", "focus", "fill", "type",
           "press", "select", "check", "uncheck", "toggle", "expand", "collapse", "scroll",
@@ -707,6 +794,141 @@ export class Computer {
         surface: "desktop",
         engine: "windows",
         strategy: view,
+        delivery: "observed",
+        retry: "safe",
+        verified: true,
+        revision: remembered.revision
+      })
+    };
+  }
+
+  async _installedApps() {
+    if (process.platform !== "win32") {
+      throw new NexcoreError("PLATFORM_UNSUPPORTED", "Installed software inventory is currently available on Windows.", {
+        retry: "safe"
+      });
+    }
+    const script = [
+      "$ErrorActionPreference = 'Stop'",
+      "[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)",
+      "$OutputEncoding = [Console]::OutputEncoding",
+      "$items = @(Get-StartApps | ForEach-Object { [pscustomobject]@{ name = [string]$_.Name; appId = [string]$_.AppID; source = 'StartMenu' } })",
+      "$items | Sort-Object name | ConvertTo-Json -Compress"
+    ].join("; ");
+    const result = await runProcess("powershell.exe", [
+      "-NoProfile",
+      "-NonInteractive",
+      "-ExecutionPolicy",
+      "Bypass",
+      "-Command",
+      script
+    ], { timeoutMs: 30000 });
+    if (result.code !== 0) {
+      throw new NexcoreError("SOFTWARE_INVENTORY_FAILED", result.stderr.trim() || "Get-StartApps failed.", {
+        retry: "safe"
+      });
+    }
+    const parsed = JSON.parse(result.stdout.trim() || "[]");
+    const items = Array.isArray(parsed) ? parsed : [parsed];
+    return items
+      .filter((item) => item && item.name)
+      .map((item) => ({
+        name: String(item.name),
+        appId: String(item.appId || ""),
+        source: String(item.source || "StartMenu")
+      }));
+  }
+
+  async _softwareView(input) {
+    const all = await this._installedApps();
+    const query = String(input.query || "").toLocaleLowerCase();
+    const filtered = (query
+      ? all.filter((item) => `${item.name} ${item.appId}`.toLocaleLowerCase().includes(query))
+      : all
+    ).slice(0, Math.max(1, Math.min(500, Number(input.maxItems) || 200)));
+    const items = filtered.map((item) => {
+      const browser = /edge|chrome|firefox|brave|opera|browser/i.test(item.name);
+      return {
+        ...item,
+        launchName: item.name,
+        launchAdapter: "windows-mcp",
+        controlAdapters: browser
+          ? ["agent-desktop", "windows-mcp", "agent-browser", "playwright-mcp"]
+          : ["agent-desktop", "windows-mcp"]
+      };
+    });
+    const text = filtered.length
+      ? filtered.map((item, index) => `${index + 1}. ${item.name}${item.appId ? `  [${item.appId}]` : ""}`).join("\n")
+      : "(no installed software matched)";
+    const key = ["software", this.config.session, query, input.maxItems || ""].join(":");
+    const remembered = this._remember(key, text);
+    return {
+      surface: "desktop",
+      view: "software",
+      count: filtered.length,
+      total: all.length,
+      complete: true,
+      text: input.delta !== false && remembered.previous
+        ? diffLines(remembered.previous.text, text)
+        : text,
+      items,
+      adapterProjects: SOFTWARE_PROJECTS,
+      revision: remembered.revision,
+      receipt: controlReceipt("observe", {
+        surface: "desktop",
+        engine: "windows-start-menu",
+        strategy: "installed-software",
+        delivery: "observed",
+        retry: "safe",
+        verified: true,
+        revision: remembered.revision
+      })
+    };
+  }
+
+  async _commandExists(command) {
+    if (process.platform !== "win32") return null;
+    const result = await runProcess("where.exe", [command], { timeoutMs: 3000 });
+    if (result.code !== 0) return null;
+    return result.stdout.split(/\r?\n/).map((line) => line.trim()).find(Boolean) || command;
+  }
+
+  async _adapterView(input) {
+    const commands = await Promise.all(CLI_ADAPTERS.map(async (adapter) => ({
+      ...adapter,
+      path: await this._commandExists(adapter.command).catch(() => null)
+    })));
+    const projects = SOFTWARE_PROJECTS.map((project) => ({
+      ...project,
+      state: project.id === "windows-mcp"
+        ? this.windowsMcp.enabled ? "on-demand" : "disabled"
+        : project.kind === "bundled" ? "bundled" : "optional"
+    }));
+    const lines = [
+      "CONTROL ENGINES",
+      ...projects.map((item) => `${item.id}: ${item.state} · ${item.role}`),
+      "",
+      "CLI ADAPTERS",
+      ...commands.map((item) => `${item.id}: ${item.path ? `available · ${item.path}` : "not found"} · ${item.operations.join(", ")}`)
+    ];
+    const text = lines.join("\n");
+    const key = ["adapters", this.config.session, input.query || ""].join(":");
+    const remembered = this._remember(key, text);
+    return {
+      surface: "desktop",
+      view: "adapters",
+      count: projects.length + commands.length,
+      total: projects.length + commands.length,
+      complete: true,
+      text: input.delta !== false && remembered.previous
+        ? diffLines(remembered.previous.text, text)
+        : text,
+      items: { projects, cli: commands },
+      revision: remembered.revision,
+      receipt: controlReceipt("observe", {
+        surface: "desktop",
+        engine: "adapter-registry",
+        strategy: "software-capabilities",
         delivery: "observed",
         retry: "safe",
         verified: true,
@@ -977,7 +1199,7 @@ export class Computer {
       surface = "browser";
     } else if (
       DESKTOP_VIEWS[view]
-      || ["semantic", "window", "tree", "accessibility"].includes(view)
+      || ["software", "installed", "adapters", "semantic", "window", "tree", "accessibility"].includes(view)
       || input.app
       || windowId
       || windowTitle
@@ -1021,6 +1243,21 @@ export class Computer {
       };
     }
     if (surface === "desktop" && input.view) {
+      if (requestedView === "adapters") {
+        const viewed = await this._adapterView(input);
+        viewed.bytes = Buffer.byteLength(viewed.text, "utf8");
+        viewed.estimatedTokens = estimateTokens(viewed.text);
+        return viewed;
+      }
+      if (["software", "installed"].includes(requestedView)) {
+        const viewed = await this._softwareView({
+          ...input,
+          view: "software"
+        });
+        viewed.bytes = Buffer.byteLength(viewed.text, "utf8");
+        viewed.estimatedTokens = estimateTokens(viewed.text);
+        return viewed;
+      }
       try {
         const viewed = await this._desktopView(input);
         viewed.bytes = Buffer.byteLength(viewed.text, "utf8");

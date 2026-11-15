@@ -166,6 +166,27 @@ test("desktop inventory views escape a previous browser session", async () => {
   assert.deepEqual(calls.slice(1).map((args) => args[1]), ["list-apps", "list-windows"]);
 });
 
+test("software inventory and adapter registry are separate from running apps", async () => {
+  const computer = new Computer({ desktopBin: "unused", browserBin: "unused" });
+  computer._installedApps = async () => [
+    { name: "计算器", appId: "Microsoft.WindowsCalculator_8wekyb3d8bbwe!App", source: "StartMenu" },
+    { name: "Visual Studio Code", appId: "Microsoft.VisualStudioCode", source: "StartMenu" }
+  ];
+  computer._commandExists = async (command) => command === "soffice"
+    ? "C:\\Program Files\\LibreOffice\\soffice.exe"
+    : null;
+
+  const software = await computer.observe({ view: "software", query: "计算器", delta: false });
+  const adapters = await computer.observe({ view: "adapters", delta: false });
+
+  assert.equal(software.count, 1);
+  assert.equal(software.items[0].launchAdapter, "windows-mcp");
+  assert.ok(software.items[0].controlAdapters.includes("agent-desktop"));
+  assert.equal(adapters.view, "adapters");
+  assert.match(adapters.text, /windows-mcp/i);
+  assert.match(adapters.text, /libreoffice: available/);
+});
+
 test("Windows-MCP is the desktop fallback for observation, launch, and click", async () => {
   const computer = new Computer({ desktopBin: "unused", browserBin: "unused" });
   computer._desktop = async () => {

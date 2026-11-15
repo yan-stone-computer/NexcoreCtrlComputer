@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./assets/hero-v040.svg" alt="NexcoreCtrlComputer 0.4.0 桌面与浏览器控制流程" width="100%">
+  <img src="./assets/hero-v040.svg" alt="NexcoreCtrlComputer 0.4.1 桌面与浏览器控制流程" width="100%">
 </p>
 
 <h1 align="center">NexcoreCtrlComputer</h1>
@@ -19,10 +19,16 @@ JS/CLI/MCP 契约控制桌面和浏览器，在本地完成无障碍目标定位
 **agent-desktop**、**agent-browser** 和显式开启的 PyAutoGUI 兜底；它不是
 一个独立的桌面软件。
 
-## 0.4.0 增加了什么
+## 0.4.1 增加了什么
 
-`0.4.0` 在保留 `agent-desktop` 语义核心的同时，增加 Windows 分层回退：
+`0.4.1` 在 `0.4.0` 的 Windows 分层回退之上，增加已安装软件发现和适配器注册表：
 
+- `observe({ view: "software" })` 列出 Start Menu 中可启动的软件、准确名称和
+  AUMID，与只表示正在运行应用的 `apps` 明确分开。
+- `observe({ view: "adapters" })` 报告桌面、浏览器、视觉、录制回放和本机 CLI
+  适配器；可选项目不会伪装成已经安装。
+- 软件结果携带 `launchAdapter` 与 `controlAdapters`，智能体可以按准确名称启动，
+  再选择相应的语义控制路线。
 - 主桌面后端不可用时，可由 `Windows-MCP` 启动应用、抓取桌面/窗口状态、
   解析控件标签、模拟输入并等待文本。
 - 回退仍走同一个 JS/CLI/MCP 契约，并返回相同的路由、投递和验证回执。

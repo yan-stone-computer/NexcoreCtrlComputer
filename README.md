@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./assets/hero-v040.svg" alt="NexcoreCtrlComputer 0.4.0 desktop and browser control flow" width="100%">
+  <img src="./assets/hero-v040.svg" alt="NexcoreCtrlComputer 0.4.1 desktop and browser control flow" width="100%">
 </p>
 
 <h1 align="center">NexcoreCtrlComputer</h1>
@@ -28,11 +28,17 @@ The durable unit can be a one-off semantic action or a parameterized UI program.
 The kernel is built on **agent-desktop**, **agent-browser**, and an explicitly
 gated PyAutoGUI fallback. It is not a standalone desktop app.
 
-## What changed in 0.4.0
+## What changed in 0.4.1
 
-`0.4.0` adds a layered Windows fallback path while keeping `agent-desktop` as
-the semantic desktop core:
+`0.4.1` adds installed-software discovery and an adapter registry on top of the
+`0.4.0` layered Windows fallback:
 
+- `observe({ view: "software" })` lists launchable Start Menu applications with
+  their exact launch names and AUMIDs.
+- `observe({ view: "adapters" })` reports desktop, browser, vision, workflow,
+  and local CLI adapters without pretending optional engines are installed.
+- Software results include `launchAdapter` and `controlAdapters`, so the model
+  can open the exact app and then choose the right semantic control route.
 - `Windows-MCP` can launch applications, capture desktop/window state, resolve
   labels, synthesize input, and wait for text when the primary desktop backend
   is unavailable.
