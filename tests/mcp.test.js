@@ -39,6 +39,12 @@ test("MCP exposes one compact computer tool", async () => {
   const list = rows.find((row) => row.id === 2);
   assert.equal(list.result.tools.length, 1);
   assert.equal(list.result.tools[0].name, "computer");
+  assert.deepEqual(list.result.tools[0].annotations, {
+    readOnlyHint: false,
+    destructiveHint: true,
+    idempotentHint: false,
+    openWorldHint: true
+  });
   const modes = list.result.tools[0].inputSchema.properties.mode.enum;
   assert.ok(modes.includes("program_save"));
   assert.ok(modes.includes("program_list"));
