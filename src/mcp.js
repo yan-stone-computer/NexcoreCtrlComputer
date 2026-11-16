@@ -47,10 +47,35 @@ const tool = {
       gridColumns: { type: "integer", minimum: 2, maximum: 16 },
       gridRows: { type: "integer", minimum: 2, maximum: 16 },
       inlineImage: { type: "boolean", description: "For view=visual: return the screenshot as MCP image content. Default true." },
+      includeCandidates: { type: "boolean", description: "For view=visual: merge accessible controls into annotated visual candidates. Default true." },
+      maxCandidates: { type: "integer", minimum: 1, maximum: 80, description: "Maximum accessible visual candidates. Default 32." },
+      frameId: { type: "string", description: "For a visual zoom: parent frame id from a previous visual observation." },
+      candidateId: { type: "string", description: "For a visual zoom: candidate id such as v3." },
+      region: {
+        type: "object",
+        description: "For a visual zoom: candidate/cell/normalized region.",
+        properties: {
+          candidateId: { type: "string" },
+          cell: { type: "string" },
+          normalized: {
+            type: "object",
+            properties: {
+              x: { type: "number", minimum: 0, maximum: 1 },
+              y: { type: "number", minimum: 0, maximum: 1 },
+              width: { type: "number", minimum: 0, maximum: 1 },
+              height: { type: "number", minimum: 0, maximum: 1 }
+            },
+            required: ["x", "y", "width", "height"],
+            additionalProperties: false
+          }
+        },
+        additionalProperties: false
+      },
       previewMaxWidth: { type: "integer", minimum: 320, maximum: 3840, description: "Visual preview width. Default 1600." },
       previewQuality: { type: "integer", minimum: 40, maximum: 95, description: "Visual preview JPEG quality. Default 82." },
       frameTtlMs: { type: "integer", minimum: 1000, maximum: 120000 },
       frameMaxAgeMs: { type: "integer", minimum: 1000, maximum: 120000 },
+      pointerDurationMs: { type: "integer", minimum: 0, maximum: 5000, description: "Optional visible pointer travel time for visual clicks." },
       maxNodes: { type: "integer", minimum: 1, maximum: 1000 },
       depth: { type: "integer", minimum: 1, maximum: 50 },
       selector: { type: "string", description: "Optional browser CSS scope." },
@@ -87,6 +112,8 @@ const tool = {
               name: { type: "string" },
               first: { type: "boolean" },
               frameId: { type: "string", description: "Visual frame id from observe({view:'visual'})." },
+              zoomId: { type: "string", description: "Visual zoom id from observe({view:'visual',frameId,region})." },
+              candidateId: { type: "string", description: "Candidate id such as v3." },
               cell: { type: "string", description: "Visual grid cell such as C4." },
               normalized: {
                 type: "object",

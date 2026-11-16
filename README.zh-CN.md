@@ -27,7 +27,9 @@ JS/CLI/MCP 契约控制桌面和浏览器，在本地完成无障碍目标定位
 - `observe({ view: "visual" })` 抓取全桌面帧，并生成紧凑 MCP 预览。
 - 每个动作绑定 30 秒有效的 SHA-256 `frameId`，窗口发生变化后拒绝执行。
 - 网格和归一化坐标通过显示器 bounds/DPI 映射到物理像素。
+- 可用无障碍 bounds 生成带编号的视觉候选框，再对可疑区域继续放大。
 - `click`、`double_click`、`right_click`、`hover` 可直接使用 `{ frameId, cell }`。
+- 没有语义后置条件时，可用 `expect.property="visual_changed"` 对比动作前后截图。
 - 原始 PNG 保留用于局部放大，MCP 默认只收到 1600px JPEG 预览。
 
 ## 0.4.1 增加了什么

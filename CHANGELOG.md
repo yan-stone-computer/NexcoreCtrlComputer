@@ -4,8 +4,10 @@
 
 - Added short-lived full-desktop visual frames with SHA-256 identity and active-window matching.
 - Added DPI-safe grid and normalized coordinate mapping for visual pointer actions.
+- Added accessible candidate marks and zoom regions that map back to the parent frame.
 - Added click, double-click, right-click, and hover targets bound to a visual frame.
 - Added compact MCP image previews while retaining the full-resolution source screenshot.
+- Added `visual_changed` post-action verification for pixel-only surfaces.
 - Added visual frame, coordinate mapping, expiry, stale-window, and pointer regression tests.
 
 ## 0.4.1 - 2026-11-15

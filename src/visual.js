@@ -153,7 +153,12 @@ export function resolveVisualPoint(frame, target = {}) {
   if (!frame?.display?.bounds || !frame?.grid) throw visualError("VISUAL_FRAME_INVALID", "Visual frame metadata is incomplete.");
   let normalized;
   let strategy;
-  if (target.cell !== undefined) {
+  if (target.candidateId !== undefined) {
+    const candidate = (frame.candidates || []).find(item => String(item.id) === String(target.candidateId));
+    if (!candidate) throw visualError("VISUAL_CANDIDATE_UNKNOWN", `Unknown visual candidate: ${target.candidateId}`);
+    normalized = candidate.normalized;
+    strategy = `visual-candidate:${candidate.id}`;
+  } else if (target.cell !== undefined) {
     const cell = parseCell(target.cell, frame.grid);
     const at = normalizedOffset(target.at);
     normalized = {
@@ -177,6 +182,97 @@ export function resolveVisualPoint(frame, target = {}) {
     y: Math.round(frame.display.bounds.y + normalized.y * frame.display.bounds.height)
   };
   return { frameId: frame.frameId, strategy, normalized, imagePoint, screenPoint };
+}
+
+export function resolveVisualRegion(frame, region = {}) {
+  if (region.candidateId !== undefined) {
+    const candidate = (frame.candidates || []).find(item => String(item.id) === String(region.candidateId));
+    if (!candidate) throw visualError("VISUAL_CANDIDATE_UNKNOWN", `Unknown visual candidate: ${region.candidateId}`);
+    return {
+      crop: [
+        Math.max(0, Math.floor(candidate.bounds.x)),
+        Math.max(0, Math.floor(candidate.bounds.y)),
+        Math.min(frame.width, Math.ceil(candidate.bounds.x + candidate.bounds.width)),
+        Math.min(frame.height, Math.ceil(candidate.bounds.y + candidate.bounds.height))
+      ],
+      normalized: {
+        x: candidate.bounds.x / frame.width,
+        y: candidate.bounds.y / frame.height,
+        width: candidate.bounds.width / frame.width,
+        height: candidate.bounds.height / frame.height
+      },
+      source: `candidate:${candidate.id}`
+    };
+  }
+  let normalized;
+  let source;
+  if (region.cell !== undefined) {
+    const cell = parseCell(region.cell, frame.grid);
+    normalized = {
+      x: cell.column / frame.grid.columns,
+      y: cell.row / frame.grid.rows,
+      width: 1 / frame.grid.columns,
+      height: 1 / frame.grid.rows
+    };
+    source = `cell:${String(region.cell).toUpperCase()}`;
+  } else if (region.normalized) {
+    const x = Number(region.normalized.x);
+    const y = Number(region.normalized.y);
+    const width = Number(region.normalized.width);
+    const height = Number(region.normalized.height);
+    if ([x, y, width, height].some(value => !Number.isFinite(value) || value < 0 || value > 1) || width <= 0 || height <= 0) {
+      throw visualError("INVALID_VISUAL_REGION", "normalized region needs x, y, width, height between 0 and 1.");
+    }
+    normalized = { x, y, width, height };
+    source = "normalized";
+  } else {
+    throw visualError("VISUAL_REGION_REQUIRED", "Zoom needs candidateId, cell, or normalized region.");
+  }
+  const left = Math.floor(normalized.x * frame.width);
+  const top = Math.floor(normalized.y * frame.height);
+  const right = Math.min(frame.width, Math.ceil((normalized.x + normalized.width) * frame.width));
+  const bottom = Math.min(frame.height, Math.ceil((normalized.y + normalized.height) * frame.height));
+  if (right <= left || bottom <= top) throw visualError("INVALID_VISUAL_REGION", "Visual region is empty.");
+  return { crop: [left, top, right, bottom], normalized, source };
+}
+
+export function resolveVisualZoomPoint(zoom, target = {}) {
+  if (!zoom?.frame || !zoom?.normalized) throw visualError("VISUAL_ZOOM_INVALID", "Visual zoom metadata is incomplete.");
+  let local;
+  let strategy;
+  if (target.cell !== undefined) {
+    const cell = parseCell(target.cell, zoom.grid);
+    const at = normalizedOffset(target.at);
+    local = {
+      x: (cell.column + at.x) / zoom.grid.columns,
+      y: (cell.row + at.y) / zoom.grid.rows
+    };
+    strategy = `visual-zoom-cell:${String(target.cell).toUpperCase()}`;
+  } else if (target.normalized) {
+    local = normalizedOffset(target.normalized);
+    strategy = "visual-zoom-normalized";
+  } else {
+    throw visualError("VISUAL_TARGET_REQUIRED", "Zoom target needs cell or normalized {x,y}.");
+  }
+  const normalized = {
+    x: zoom.normalized.x + local.x * zoom.normalized.width,
+    y: zoom.normalized.y + local.y * zoom.normalized.height
+  };
+  const frame = zoom.frame;
+  return {
+    frameId: frame.frameId,
+    zoomId: zoom.zoomId,
+    strategy,
+    normalized,
+    imagePoint: {
+      x: Math.round(normalized.x * frame.width),
+      y: Math.round(normalized.y * frame.height)
+    },
+    screenPoint: {
+      x: Math.round(frame.display.bounds.x + normalized.x * frame.display.bounds.width),
+      y: Math.round(frame.display.bounds.y + normalized.y * frame.display.bounds.height)
+    }
+  };
 }
 
 export function visualFrameText(frame) {

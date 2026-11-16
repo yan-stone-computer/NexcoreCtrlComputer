@@ -194,6 +194,25 @@ The source PNG stays available for zooming; MCP receives an automatically
 downscaled 1600px JPEG preview so a 4K desktop does not become a multi-megabyte
 tool response.
 
+When the active window exposes accessibility bounds, visual observation also
+returns annotated candidates such as `v1 button "Save" cell=C4`. Candidate ids
+are safer than raw pixels because the same accessible element supplies its
+physical rectangle and center point.
+
+```json
+{
+  "view": "visual",
+  "frameId": "<parent frameId>",
+  "region": { "cell": "C4" },
+  "grid": { "columns": 6, "rows": 6 }
+}
+```
+
+A second observation with `frameId + region` returns a zoomed image and
+`zoomId`. This is the visual equivalent of observe -> zoom -> act: the first
+image locates a rough region, the zoom resolves a small target, and the parent
+frame remains the source of truth for coordinates.
+
 ```json
 {
   "action": "click",
@@ -203,6 +222,10 @@ tool response.
 ```
 
 `click`, `double_click`, `right_click`, and `hover` reuse the same visual target.
+Targets may use `{ frameId, candidateId }`, `{ frameId, cell }`, or
+`{ zoomId, cell }`. Set `expect.property` to `visual_changed` when no semantic
+postcondition exists; the controller captures a fresh frame and verifies that
+the desktop changed instead of trusting `ok: true`.
 The controller requires both `allowCoordinates` and `allowHeaded`, checks frame
 expiry, and rejects the action if the active window changed. Coordinates are
 mapped from normalized image space to physical display space, so per-monitor DPI

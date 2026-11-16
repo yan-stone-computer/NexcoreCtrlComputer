@@ -1,11 +1,14 @@
 import assert from "node:assert/strict";
+import { unlinkSync, writeFileSync } from "node:fs";
 import test from "node:test";
 import { ActionPolicy, Computer } from "../src/index.js";
 import {
   createVisualFrame,
   imageDimensions,
   normalizeVisualGrid,
+  resolveVisualRegion,
   resolveVisualPoint,
+  resolveVisualZoomPoint,
   visualFrameExpired
 } from "../src/visual.js";
 
@@ -50,6 +53,35 @@ test("visual frame validation rejects unsupported grids and reports expiry", () 
   assert.equal(visualFrameExpired({ expiresAt: 101 }, 100), false);
 });
 
+test("visual candidates and zoom regions map back to the parent frame", () => {
+  const frame = createVisualFrame({
+    bytes: PNG_1X1,
+    imagePath: "frame.png",
+    display: { id: "monitor-1", bounds: { x: 100, y: 50, width: 2000, height: 1000 } },
+    grid: { columns: 8, rows: 6 }
+  });
+  frame.width = 2000;
+  frame.height = 1000;
+  frame.candidates = [{
+    id: "v3",
+    role: "button",
+    name: "Save",
+    bounds: { x: 500, y: 250, width: 200, height: 100 },
+    normalized: { x: 0.3, y: 0.3 }
+  }];
+  const candidate = resolveVisualPoint(frame, { candidateId: "v3" });
+  assert.deepEqual(candidate.screenPoint, { x: 700, y: 350 });
+  const candidateRegion = resolveVisualRegion(frame, { candidateId: "v3" });
+  assert.deepEqual(candidateRegion.normalized, { x: 0.25, y: 0.25, width: 0.1, height: 0.1 });
+  const region = resolveVisualRegion(frame, { cell: "C2" });
+  assert.deepEqual(region.normalized, { x: 0.25, y: 0.16666666666666666, width: 0.125, height: 0.16666666666666666 });
+  const zoom = { zoomId: "z1", frame, normalized: region.normalized, grid: { columns: 4, rows: 2 } };
+  const point = resolveVisualZoomPoint(zoom, { cell: "D2" });
+  assert.ok(Math.abs(point.normalized.x - 0.359375) < 1e-12);
+  assert.ok(Math.abs(point.normalized.y - 0.2916666666666667) < 1e-12);
+  assert.deepEqual(point.screenPoint, { x: 819, y: 342 });
+});
+
 test("visual pointer actions use a live frame and the mapped physical point", async () => {
   const frame = createVisualFrame({
     bytes: PNG_1X1,
@@ -74,10 +106,14 @@ test("visual pointer actions use a live frame and the mapped physical point", as
   const result = await controller.act({
     surface: "desktop",
     action: "double_click",
+    pointerDurationMs: 750,
     target: { frameId: frame.frameId, cell: "D2", at: { x: 0.5, y: 0.5 } }
   });
 
-  assert.deepEqual({ x: payload.x, y: payload.y, clicks: payload.clicks }, { x: 1680, y: 810, clicks: 2 });
+  assert.deepEqual(
+    { x: payload.x, y: payload.y, clicks: payload.clicks, durationMs: payload.durationMs },
+    { x: 1680, y: 810, clicks: 2, durationMs: 750 }
+  );
   assert.equal(result.delivery, "delivered_unverified");
   assert.equal(result.receipt.route.strategy, "visual-cell:D2");
 });
@@ -105,4 +141,83 @@ test("visual pointer actions reject a frame after the active window changes", as
     }),
     error => error.code === "VISUAL_FRAME_STALE"
   );
+});
+
+test("visual zoom actions map through the parent frame before input", async () => {
+  const frame = createVisualFrame({
+    bytes: PNG_1X1,
+    imagePath: "frame.png",
+    display: { id: "monitor-1", bounds: { x: 100, y: 50, width: 2000, height: 1000 } },
+    activeWindow: { id: 7, title: "Fixture", bounds: null },
+    grid: { columns: 8, rows: 6 }
+  });
+  const controller = Object.create(Computer.prototype);
+  controller.closed = false;
+  controller.activeSurface = "desktop";
+  controller.config = { timeoutMs: 1000 };
+  controller.policy = new ActionPolicy({ allowCoordinates: true, allowHeaded: true });
+  controller.visualFrames = new Map([[frame.frameId, frame]]);
+  controller.visualZooms = new Map([["zoom-1", {
+    zoomId: "zoom-1",
+    frame,
+    normalized: { x: 0.25, y: 0.25, width: 0.5, height: 0.5 },
+    grid: { columns: 4, rows: 4 }
+  }]]);
+  controller._desktop = async () => ({ data: [{ id: 7, is_focused: true }] });
+  let payload;
+  controller._pyautogui = async value => {
+    payload = value;
+    return { x: value.x, y: value.y };
+  };
+  const result = await controller.act({
+    surface: "desktop",
+    action: "click",
+    target: { zoomId: "zoom-1", normalized: { x: 0.5, y: 0.5 } }
+  });
+  assert.deepEqual(payload, {
+    action: "click",
+    x: 1100,
+    y: 550,
+    button: "left",
+    clicks: 1,
+    timeoutMs: 1000
+  });
+  assert.equal(result.zoomId, "zoom-1");
+});
+
+test("visual_changed verifies that the post-action desktop frame changed", async () => {
+  const frame = createVisualFrame({
+    bytes: PNG_1X1,
+    imagePath: "frame.png",
+    display: { id: "monitor-1", bounds: { x: 0, y: 0, width: 1920, height: 1080 } },
+    activeWindow: { id: 7, title: "Calculator", bounds: null },
+    grid: { columns: 4, rows: 2 }
+  });
+  const controller = Object.create(Computer.prototype);
+  controller.closed = false;
+  controller.activeSurface = "desktop";
+  controller.config = { timeoutMs: 1000 };
+  controller.policy = new ActionPolicy({ allowCoordinates: true, allowHeaded: true });
+  controller.visualFrames = new Map([[frame.frameId, frame]]);
+  let afterPath;
+  controller._desktop = async args => {
+    if (args[0] === "screenshot") {
+      afterPath = args[1];
+      writeFileSync(afterPath, Buffer.from("changed-frame"));
+    }
+    return { data: [{ id: 7, is_focused: true }] };
+  };
+  controller._pyautogui = async () => ({ ok: true });
+
+  const result = await controller.act({
+    surface: "desktop",
+    action: "click",
+    target: { frameId: frame.frameId, cell: "A1" },
+    expect: { property: "visual_changed", timeoutMs: 1 }
+  });
+  assert.equal(result.verification.ok, true);
+  assert.equal(result.delivery, "delivered_verified");
+  assert.equal(result.verification.beforeFrameId, frame.frameId);
+  assert.notEqual(result.verification.afterFrameId, frame.frameId);
+  if (afterPath) unlinkSync(afterPath);
 });

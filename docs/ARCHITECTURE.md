@@ -56,11 +56,22 @@ returns it to MCP clients, and records a short-lived frame contract:
 - physical image dimensions, display bounds, and display scale;
 - a labeled normalized grid whose cells map safely to physical coordinates.
 
+Accessible controls with bounds are projected into the same frame as numbered
+candidate marks. The preview combines the grid and marks, while the model may
+select a candidate id, a grid cell, or a normalized point. Dense regions can be
+cropped into a second image with a `zoomId`; zoom coordinates map back through
+the parent frame before physical input.
+
 Pointer actions accept `{ frameId, cell }` or `{ frameId, normalized }`. Before
 input, the runtime rejects unknown/expired frames and frames whose active window
 changed. It then maps the normalized point to physical display coordinates and
 returns the mapping in the control receipt. The first implementation rejects
 app-scoped screenshots because their screen origin has not yet been proven.
+
+When semantic postconditions are unavailable, `visual_changed` compares the
+frame hash after the action. This proves that pixels changed, not that the
+intended business action succeeded; callers should prefer semantic verification
+whenever the app exposes it.
 
 ## Backend ownership
 

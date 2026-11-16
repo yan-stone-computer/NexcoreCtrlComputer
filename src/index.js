@@ -7,7 +7,9 @@ import { fileURLToPath } from "node:url";
 import { ProgramRuntime, ProgramStore } from "./programs.js";
 import {
   createVisualFrame,
+  resolveVisualRegion,
   resolveVisualPoint,
+  resolveVisualZoomPoint,
   visualFrameExpired,
   visualFrameText
 } from "./visual.js";
@@ -561,6 +563,7 @@ export class Computer {
     this.programRuntime = new ProgramRuntime(this, this.programStore);
     this.windowsMcp = new WindowsMcpBridge(options.windowsMcp || {});
     this.visualFrames = new Map();
+    this.visualZooms = new Map();
     this.previous = new Map();
     this.activeSurface = "desktop";
     this.closed = false;
@@ -1031,6 +1034,9 @@ export class Computer {
       grid: input.grid || { columns: input.gridColumns, rows: input.gridRows },
       ttlMs
     });
+    if (input.includeCandidates !== false && activeWindow) {
+      frame.candidates = await this._visualCandidates(frame, activeWindow, input.maxCandidates);
+    }
     const previewPath = imagePath.replace(/\.png$/i, ".preview.jpg");
     let preview = null;
     try {
@@ -1040,6 +1046,8 @@ export class Computer {
         outputPath: previewPath,
         maxWidth: input.previewMaxWidth || 1600,
         quality: input.previewQuality || 82,
+        grid: frame.grid,
+        marks: frame.candidates || [],
         timeoutMs: this.config.timeoutMs
       });
     } catch {
@@ -1047,8 +1055,14 @@ export class Computer {
     }
     this.visualFrames.set(frame.frameId, frame);
     while (this.visualFrames.size > 8) this.visualFrames.delete(this.visualFrames.keys().next().value);
+    const candidateText = (frame.candidates || []).length
+      ? `\ncandidates:\n${frame.candidates.map(item =>
+          `${item.id} ${item.role || "node"} "${item.name || item.value || ""}" cell=${item.gridCell} center=${item.screenPoint.x},${item.screenPoint.y}`
+        ).join("\n")}`
+      : "";
     const text = visualFrameText(frame)
-      + (preview ? `\npreview=${preview.path} ${preview.width}x${preview.height} ${preview.mimeType}` : "");
+      + (preview ? `\npreview=${preview.path} ${preview.width}x${preview.height} ${preview.mimeType}` : "")
+      + candidateText;
     return {
       surface: "desktop",
       view: "visual",
@@ -1064,6 +1078,7 @@ export class Computer {
       display: frame.display,
       activeWindow: frame.activeWindow,
       grid: frame.grid,
+      candidates: frame.candidates || [],
       createdAt: frame.createdAt,
       expiresAt: frame.expiresAt,
       inlineImage: input.inlineImage !== false,
@@ -1082,9 +1097,161 @@ export class Computer {
     };
   }
 
+  async _visualCandidates(frame, activeWindow, maxCandidates) {
+    const app = String(activeWindow.app_name || activeWindow.process_name || "");
+    if (!app) return [];
+    let response;
+    try {
+      response = await this._desktop([
+        "snapshot",
+        "--app",
+        app,
+        "--interactive-only",
+        "--compact",
+        "--include-bounds"
+      ]);
+    } catch {
+      return [];
+    }
+    const limit = Math.max(1, Math.min(80, Number(maxCandidates) || 32));
+    const boundsOf = node => {
+      const bounds = node.bounds;
+      if (!bounds || !Number.isFinite(Number(bounds.x)) || !Number.isFinite(Number(bounds.y))) return null;
+      if (!Number.isFinite(Number(bounds.width)) || !Number.isFinite(Number(bounds.height))) return null;
+      return {
+        x: Number(bounds.x),
+        y: Number(bounds.y),
+        width: Number(bounds.width),
+        height: Number(bounds.height)
+      };
+    };
+    const display = frame.display.bounds;
+    return desktopRecords(response.data, { interactiveOnly: true })
+      .filter(node => node.ref_id)
+      .flatMap(node => {
+        const bounds = boundsOf(node);
+        if (!bounds) return [];
+        if (
+          bounds.x >= display.x + display.width
+          || bounds.y >= display.y + display.height
+          || bounds.x + bounds.width <= display.x
+          || bounds.y + bounds.height <= display.y
+        ) return [];
+        const normalized = {
+          x: ((bounds.x + bounds.width / 2) - display.x) / display.width,
+          y: ((bounds.y + bounds.height / 2) - display.y) / display.height
+        };
+        return [{
+          ref: node.ref_id,
+          role: node.role,
+          name: node.name,
+          value: node.value,
+          bounds: {
+            x: (bounds.x - display.x) * frame.width / display.width,
+            y: (bounds.y - display.y) * frame.height / display.height,
+            width: bounds.width * frame.width / display.width,
+            height: bounds.height * frame.height / display.height
+          },
+          normalized,
+          screenPoint: {
+            x: Math.round(display.x + normalized.x * display.width),
+            y: Math.round(display.y + normalized.y * display.height)
+          }
+        }];
+      })
+      .slice(0, limit)
+      .map((item, index) => ({
+        id: `v${index + 1}`,
+        ...item,
+        gridCell: `${String.fromCharCode(65 + Math.min(frame.grid.columns - 1, Math.floor(item.normalized.x * frame.grid.columns)))}${Math.min(frame.grid.rows, Math.floor(item.normalized.y * frame.grid.rows) + 1)}`
+      }));
+  }
+
+  async _visualZoom(input) {
+    const frame = this.visualFrames.get(String(input.frameId || ""));
+    if (!frame) {
+      throw new NexcoreError("VISUAL_FRAME_UNKNOWN", "Unknown visual frame; capture observe({view:'visual'}) first.", {
+        retry: "safe"
+      });
+    }
+    if (visualFrameExpired(frame)) {
+      this.visualFrames.delete(frame.frameId);
+      throw new NexcoreError("VISUAL_FRAME_EXPIRED", "Visual frame expired; capture a fresh screenshot.", {
+        retry: "safe"
+      });
+    }
+    const region = resolveVisualRegion(frame, input.region || {
+      candidateId: input.candidateId,
+      cell: input.cell,
+      normalized: input.normalized
+    });
+    const grid = input.grid || { columns: 6, rows: 6 };
+    const zoomId = createHash("sha256")
+      .update(`${frame.frameId}:${region.crop.join(",")}:${grid.columns}x${grid.rows}:${Date.now()}`)
+      .digest("hex");
+    const previewPath = frame.imagePath.replace(/\.png$/i, `.zoom-${zoomId.slice(0, 8)}.jpg`);
+    const preview = await this._pyautogui({
+      action: "preview",
+      inputPath: frame.imagePath,
+      outputPath: previewPath,
+      crop: region.crop,
+      grid,
+      marks: [],
+      maxWidth: input.previewMaxWidth || 1600,
+      quality: input.previewQuality || 90,
+      timeoutMs: this.config.timeoutMs
+    });
+    const zoom = {
+      zoomId,
+      frameId: frame.frameId,
+      frame,
+      crop: region.crop,
+      normalized: region.normalized,
+      grid,
+      preview,
+      createdAt: Date.now(),
+      expiresAt: frame.expiresAt
+    };
+    this.visualZooms.set(zoomId, zoom);
+    while (this.visualZooms.size > 16) this.visualZooms.delete(this.visualZooms.keys().next().value);
+    const text = [
+      `visual zoom ${zoomId.slice(0, 16)} · source=${region.source}`,
+      `parentFrame=${frame.frameId}`,
+      `crop=${region.crop.join(",")} grid=${grid.columns}x${grid.rows}`,
+      `preview=${preview.path} ${preview.width}x${preview.height} ${preview.mimeType}`,
+      `act with target={"zoomId":"${zoomId}","cell":"C4"}`,
+      `expiresAt=${new Date(frame.expiresAt).toISOString()}`
+    ].join("\n");
+    return {
+      surface: "desktop",
+      view: "visual_zoom",
+      text,
+      zoomId,
+      frameId: frame.frameId,
+      imagePath: preview.path,
+      mimeType: preview.mimeType,
+      imageWidth: preview.width,
+      imageHeight: preview.height,
+      crop: region.crop,
+      normalized: region.normalized,
+      grid,
+      inlineImage: input.inlineImage !== false,
+      receipt: controlReceipt("observe", {
+        surface: "desktop",
+        engine: "desktop",
+        strategy: `visual-zoom:${region.source}`,
+        delivery: "observed",
+        retry: "safe",
+        verified: true,
+        revision: zoomId.slice(0, 12)
+      })
+    };
+  }
+
   async _resolveVisualTarget(target, input = {}) {
     this.policy.requireCoordinates();
-    const frame = this.visualFrames.get(String(target.frameId || ""));
+    const zoom = target.zoomId ? this.visualZooms.get(String(target.zoomId)) : null;
+    const frame = zoom?.frame || this.visualFrames.get(String(target.frameId || ""));
     if (!frame) {
       throw new NexcoreError("VISUAL_FRAME_UNKNOWN", "Unknown visual frame; capture observe({view:'visual'}) first.", {
         retry: "safe"
@@ -1113,18 +1280,38 @@ export class Computer {
         });
       }
     }
-    return { frame, ...resolveVisualPoint(frame, target) };
+    return {
+      frame,
+      ...(zoom ? { zoom } : {}),
+      ...(zoom ? resolveVisualZoomPoint(zoom, target) : resolveVisualPoint(frame, target))
+    };
   }
 
   async _visualPointerAction(input, action, visual) {
+    if (!Number.isFinite(visual?.screenPoint?.x) || !Number.isFinite(visual?.screenPoint?.y)) {
+      throw new NexcoreError("VISUAL_POINT_INVALID", "Visual target did not resolve to a finite screen point.", {
+        details: { screenPoint: visual?.screenPoint, normalized: visual?.normalized },
+        retry: "safe"
+      });
+    }
+    const duration = Number.isFinite(Number(input.pointerDurationMs))
+      ? { durationMs: Math.max(0, Math.min(5000, Number(input.pointerDurationMs))) }
+      : {};
     const payload = action === "hover"
-      ? { action: "move", x: visual.screenPoint.x, y: visual.screenPoint.y, timeoutMs: this.config.timeoutMs }
+      ? {
+          action: "move",
+          x: visual.screenPoint.x,
+          y: visual.screenPoint.y,
+          ...duration,
+          timeoutMs: this.config.timeoutMs
+        }
       : {
           action: "click",
           x: visual.screenPoint.x,
           y: visual.screenPoint.y,
           button: action === "right_click" ? "right" : "left",
           clicks: action === "double_click" ? 2 : 1,
+          ...duration,
           timeoutMs: this.config.timeoutMs
         };
     let data;
@@ -1147,6 +1334,7 @@ export class Computer {
     const result = actionResult("desktop", action, data, {
       strategy: visual.strategy,
       frameId: visual.frameId,
+      ...(visual.zoomId ? { zoomId: visual.zoomId } : {}),
       screenPoint: visual.screenPoint,
       imagePoint: visual.imagePoint,
       normalized: visual.normalized
@@ -1156,10 +1344,36 @@ export class Computer {
     result.receipt.route.engine = engine;
     result.receipt.effect.delivery = result.delivery;
     if (input.expect) {
-      result.verification = await this.verify({
-        ...input.expect,
-        surface: "desktop"
-      });
+      const expectedProperty = String(input.expect.property || "");
+      if (["visual_changed", "changed"].includes(expectedProperty)) {
+        await new Promise(resolve => setTimeout(resolve, Math.max(0, Math.min(3000, Number(input.expect.timeoutMs) || 250))));
+        const afterPath = defaultScreenshotPath(`nexcore-visual-after-${Date.now()}.png`);
+        await this._desktop(["screenshot", afterPath]);
+        const afterId = createHash("sha256").update(readFileSync(afterPath)).digest("hex");
+        const changed = afterId !== visual.frame.frameId;
+        result.verification = {
+          ok: changed,
+          property: "visual_changed",
+          expected: true,
+          actual: changed,
+          beforeFrameId: visual.frame.frameId,
+          afterFrameId: afterId,
+          receipt: controlReceipt("verify", {
+            surface: "desktop",
+            engine: "desktop",
+            strategy: "visual-frame-diff",
+            delivery: changed ? "verified" : "not_delivered",
+            retry: changed ? "safe" : "unsafe",
+            verified: changed,
+            revision: afterId.slice(0, 12)
+          })
+        };
+      } else {
+        result.verification = await this.verify({
+          ...input.expect,
+          surface: "desktop"
+        });
+      }
       if (result.verification.ok) result.delivery = "delivered_verified";
       result.receipt.effect.delivery = result.delivery;
       result.receipt.evidence.verified = Boolean(result.verification.ok);
@@ -1452,7 +1666,7 @@ export class Computer {
         return viewed;
       }
       if (requestedView === "visual") {
-        return this._visualView(input);
+        return input.frameId ? this._visualZoom(input) : this._visualView(input);
       }
       try {
         const viewed = await this._desktopView(input);
@@ -1769,7 +1983,7 @@ export class Computer {
       this.policy.checkApp(input.app);
     }
     let visual = null;
-    if (surface === "desktop" && input.target?.frameId) {
+    if (surface === "desktop" && (input.target?.frameId || input.target?.zoomId)) {
       if (!["click", "double_click", "right_click", "hover"].includes(action)) {
         throw new NexcoreError("VISUAL_ACTION_UNSUPPORTED", `Visual frames do not support ${action}.`, {
           details: { supported: ["click", "double_click", "right_click", "hover"] },
