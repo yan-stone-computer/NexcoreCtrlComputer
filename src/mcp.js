@@ -3,7 +3,7 @@ import { createInterface } from "node:readline";
 import { readFileSync, statSync } from "node:fs";
 import { createComputer } from "./index.js";
 
-const VERSION = "0.5.0";
+const VERSION = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
 
 const tool = {
   name: "computer",
@@ -15,7 +15,7 @@ const tool = {
     openWorldHint: true
   },
   description:
-    "Observe and control desktop or browser UI through accessibility refs. Use software to list installed Start Menu applications, adapters to inspect available control engines and CLI adapters, and apps only for running applications. Desktop inventory views also include windows, displays, notifications, surfaces, and short-lived visual frames. Prefer observe -> act -> verify. Use view=visual only when structure is insufficient; it returns a compact image, DPI-safe grid, and frameId for guarded pointer actions. One tool handles status, observe, act, batched runs, and close.",
+    "Observe and control desktop or browser UI through accessibility refs. Use software to list installed Start Menu applications, adapters to inspect available control engines and CLI adapters, and apps only for running applications. Desktop inventory views also include windows, displays, notifications, surfaces, and short-lived visual frames. Prefer observe -> act -> verify. Use view=visual only when structure is insufficient; it returns a compact image, DPI-safe grid, and frameId for guarded pointer actions. Pass windowId or windowTitle to scope a visual frame to one window and paste long text atomically. One tool handles status, observe, act, batched runs, and close.",
   inputSchema: {
     type: "object",
     properties: {
@@ -28,9 +28,12 @@ const tool = {
       view: {
         type: "string",
         enum: ["semantic", "windows", "apps", "displays", "notifications", "surfaces", "software", "adapters", "visual"],
-        description: "Observation view. Use visual for a full-screen frame plus grid."
+        description: "Observation view. Use visual for a display or scoped-window frame plus grid."
       },
       app: { type: "string", description: "Desktop application name from list-apps." },
+      appId: { type: "string", description: "Optional shell:AppsFolder AUMID used when opening an installed application." },
+      windowId: { type: "string", description: "Window id from list-windows. Also scopes visual capture and coordinate mapping." },
+      windowTitle: { type: "string", description: "Literal window-title selector when a stable window id is unavailable." },
       url: { type: "string", description: "Browser URL. Open it before observing unless open is false." },
       open: { type: "boolean", description: "Open url before browser observation. Default true." },
       query: { type: "string", description: "Literal filter over role, name, value, or description." },
@@ -90,6 +93,7 @@ const tool = {
           "focus",
           "fill",
           "type",
+          "paste",
           "press",
           "select",
           "check",
@@ -99,7 +103,17 @@ const tool = {
           "collapse",
           "scroll",
           "coordinate_click",
-          "screenshot"
+          "screenshot",
+          "close_app",
+          "window_focus",
+          "window_resize",
+          "window_move",
+          "window_minimize",
+          "window_maximize",
+          "window_restore",
+          "clipboard_get",
+          "clipboard_set",
+          "clipboard_clear"
         ]
       },
       target: {
@@ -140,9 +154,15 @@ const tool = {
           }
         ]
       },
-      text: { type: "string", description: "Text for fill or type." },
+      text: { type: "string", description: "Text for fill, type, paste, or clipboard_set." },
       value: { type: "string", description: "Value for select or expected value in verify." },
-      keys: { type: "string", description: "Keyboard chord, such as Control+s." },
+      keys: {
+        anyOf: [
+          { type: "string", description: "Keyboard chord, such as Control+s." },
+          { type: "array", items: { type: "string" }, description: "Keys or modifier chord, such as [\"CTRL\", \"V\"]." }
+        ]
+      },
+      format: { type: "string", enum: ["text", "auto", "image", "file-urls"], description: "Clipboard format for clipboard_get." },
       path: { type: "string", description: "Screenshot output path. Defaults to the OS temp directory." },
       direction: { type: "string", enum: ["up", "down", "left", "right"] },
       amount: { type: "integer", minimum: 1 },

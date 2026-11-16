@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.1 - 2026-11-17
+
+- Added window-scoped visual frames with capture-bound coordinate mapping and stale-window bounds checks.
+- Added atomic `paste` actions that click, set the clipboard, send one `Ctrl+V`, and verify the visual result.
+- Fixed modifier arrays such as `["CTRL", "V"]` being delivered as separate keystrokes.
+- Added natural `minimize`, `maximize`, and `restore` aliases for long agent runs.
+- Filtered low-value menu and container nodes from visual candidates.
+
 ## 0.5.0 - 2026-11-16
 
 - Added short-lived full-desktop visual frames with SHA-256 identity and active-window matching.

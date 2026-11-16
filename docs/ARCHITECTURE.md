@@ -48,11 +48,13 @@ UIA / AX / AT-SPI  CDP
 ## Visual-frame fallback
 
 Visual control is an explicit fallback for surfaces that expose no useful
-accessibility tree. `observe({ view: "visual" })` captures one full-desktop PNG,
-returns it to MCP clients, and records a short-lived frame contract:
+accessibility tree. `observe({ view: "visual" })` captures one display PNG, or a
+single selected window when `windowId`/`windowTitle` is supplied, and records a
+short-lived frame contract:
 
 - SHA-256 frame identity and expiry;
-- active window identity;
+- display identity plus capture kind and window identity when scoped;
+- capture bounds used as the coordinate origin;
 - physical image dimensions, display bounds, and display scale;
 - a labeled normalized grid whose cells map safely to physical coordinates.
 
@@ -63,10 +65,10 @@ cropped into a second image with a `zoomId`; zoom coordinates map back through
 the parent frame before physical input.
 
 Pointer actions accept `{ frameId, cell }` or `{ frameId, normalized }`. Before
-input, the runtime rejects unknown/expired frames and frames whose active window
-changed. It then maps the normalized point to physical display coordinates and
-returns the mapping in the control receipt. The first implementation rejects
-app-scoped screenshots because their screen origin has not yet been proven.
+input, the runtime rejects unknown/expired frames, closed windows, and windows
+that moved or resized after capture. It maps through capture bounds to physical
+screen coordinates and returns the mapping in the control receipt. Atomic
+`paste` reuses this path, then sends one clipboard-backed chord.
 
 When semantic postconditions are unavailable, `visual_changed` compares the
 frame hash after the action. This proves that pixels changed, not that the

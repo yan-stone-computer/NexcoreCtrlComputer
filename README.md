@@ -231,9 +231,17 @@ expiry, and rejects the action if the active window changed. Coordinates are
 mapped from normalized image space to physical display space, so per-monitor DPI
 and negative monitor origins do not get mixed with CSS/logical pixels.
 
-Frames expire after 30 seconds by default. The current implementation captures
-the full desktop; app/window-scoped visual frames are deliberately rejected until
-their coordinate origin can be proven.
+Frames expire after 30 seconds by default. `observe({ view: "visual", windowId })`
+or `windowTitle` captures only that window and maps normalized points through the
+window bounds, while display metadata remains available for DPI context. Before
+input, the runtime verifies that the captured window still exists and has not
+moved or resized.
+
+For WebViews and canvas editors that expose no reliable editable control, use one
+`act` call with `action: "paste"` and a visual target. It clicks the target, sets
+the clipboard, sends a single `Ctrl+V`, and defaults to `visual_changed`
+verification. Modifier arrays such as `["CTRL", "V"]` are delivered as one chord,
+not as separate keystrokes.
 
 ## 30-second demo
 
