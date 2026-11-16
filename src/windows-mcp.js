@@ -73,7 +73,7 @@ export class WindowsMcpBridge {
           WINDOWS_MCP_MERGE_WORD_NODES: process.env.WINDOWS_MCP_MERGE_WORD_NODES || "1"
         }
       });
-      const client = new Client({ name: "nexcore-ctrlcomputer", version: "0.4.0" });
+      const client = new Client({ name: "nexcore-ctrlcomputer", version: "0.5.0" });
       await client.connect(transport);
       const listed = await client.listTools();
       this.tools = listed.tools.map((tool) => tool.name);

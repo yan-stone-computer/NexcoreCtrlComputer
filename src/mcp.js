@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 import { createInterface } from "node:readline";
+import { readFileSync, statSync } from "node:fs";
 import { createComputer } from "./index.js";
 
-const VERSION = "0.4.1";
+const VERSION = "0.5.0";
 
 const tool = {
   name: "computer",
@@ -14,7 +15,7 @@ const tool = {
     openWorldHint: true
   },
   description:
-    "Observe and control desktop or browser UI through accessibility refs. Use software to list installed Start Menu applications, adapters to inspect available control engines and CLI adapters, and apps only for running applications. Desktop inventory views also include windows, displays, notifications, and surfaces. Prefer observe -> act -> verify; use screenshots only when structure is insufficient. One tool handles status, observe, act, batched runs, and close.",
+    "Observe and control desktop or browser UI through accessibility refs. Use software to list installed Start Menu applications, adapters to inspect available control engines and CLI adapters, and apps only for running applications. Desktop inventory views also include windows, displays, notifications, surfaces, and short-lived visual frames. Prefer observe -> act -> verify. Use view=visual only when structure is insufficient; it returns a compact image, DPI-safe grid, and frameId for guarded pointer actions. One tool handles status, observe, act, batched runs, and close.",
   inputSchema: {
     type: "object",
     properties: {
@@ -24,11 +25,32 @@ const tool = {
         default: "observe"
       },
       surface: { type: "string", enum: ["auto", "desktop", "browser"], default: "auto" },
+      view: {
+        type: "string",
+        enum: ["semantic", "windows", "apps", "displays", "notifications", "surfaces", "software", "adapters", "visual"],
+        description: "Observation view. Use visual for a full-screen frame plus grid."
+      },
       app: { type: "string", description: "Desktop application name from list-apps." },
       url: { type: "string", description: "Browser URL. Open it before observing unless open is false." },
       open: { type: "boolean", description: "Open url before browser observation. Default true." },
       query: { type: "string", description: "Literal filter over role, name, value, or description." },
       delta: { type: "boolean", description: "Return unchanged or changed lines after the first observation. Default true." },
+      grid: {
+        type: "object",
+        description: "For view=visual: coarse coordinate grid. Defaults to 8 columns by 6 rows.",
+        properties: {
+          columns: { type: "integer", minimum: 2, maximum: 16 },
+          rows: { type: "integer", minimum: 2, maximum: 16 }
+        },
+        additionalProperties: false
+      },
+      gridColumns: { type: "integer", minimum: 2, maximum: 16 },
+      gridRows: { type: "integer", minimum: 2, maximum: 16 },
+      inlineImage: { type: "boolean", description: "For view=visual: return the screenshot as MCP image content. Default true." },
+      previewMaxWidth: { type: "integer", minimum: 320, maximum: 3840, description: "Visual preview width. Default 1600." },
+      previewQuality: { type: "integer", minimum: 40, maximum: 95, description: "Visual preview JPEG quality. Default 82." },
+      frameTtlMs: { type: "integer", minimum: 1000, maximum: 120000 },
+      frameMaxAgeMs: { type: "integer", minimum: 1000, maximum: 120000 },
       maxNodes: { type: "integer", minimum: 1, maximum: 1000 },
       depth: { type: "integer", minimum: 1, maximum: 50 },
       selector: { type: "string", description: "Optional browser CSS scope." },
@@ -64,6 +86,26 @@ const tool = {
               role: { type: "string" },
               name: { type: "string" },
               first: { type: "boolean" },
+              frameId: { type: "string", description: "Visual frame id from observe({view:'visual'})." },
+              cell: { type: "string", description: "Visual grid cell such as C4." },
+              normalized: {
+                type: "object",
+                properties: {
+                  x: { type: "number", minimum: 0, maximum: 1 },
+                  y: { type: "number", minimum: 0, maximum: 1 }
+                },
+                required: ["x", "y"],
+                additionalProperties: false
+              },
+              at: {
+                type: "object",
+                properties: {
+                  x: { type: "number", minimum: 0, maximum: 1 },
+                  y: { type: "number", minimum: 0, maximum: 1 }
+                },
+                required: ["x", "y"],
+                additionalProperties: false
+              },
               x: { type: "number" },
               y: { type: "number" }
             },
@@ -130,7 +172,7 @@ async function call(args) {
   if (mode === "status") return computer.doctor();
   if (mode === "observe") {
     const result = await computer.observe(args);
-    return result.text;
+    return result;
   }
   if (mode === "act") return computer.act(args);
   if (mode === "run") return computer.run(args.steps || [], { continueOnError: args.continueOnError });
@@ -175,8 +217,25 @@ async function handle(message) {
     }
     try {
       const result = await call(params.arguments || {});
-      const text = typeof result === "string" ? result : JSON.stringify(result);
-      response(id, { content: [{ type: "text", text }], isError: false });
+      const text = typeof result === "string" ? result : String(result.text || JSON.stringify(result));
+      const content = [{ type: "text", text }];
+      if (result && typeof result === "object" && result.inlineImage !== false && result.imagePath) {
+        try {
+          const size = statSync(result.imagePath).size;
+          if (size <= 8 * 1024 * 1024) {
+            content.push({
+              type: "image",
+              data: readFileSync(result.imagePath).toString("base64"),
+              mimeType: result.mimeType || "image/png"
+            });
+          } else {
+            content.push({ type: "text", text: `Image omitted: ${size} bytes exceeds the 8 MiB MCP inline limit.` });
+          }
+        } catch (error) {
+          content.push({ type: "text", text: `Image unavailable: ${error.message}` });
+        }
+      }
+      response(id, { content, isError: false });
     } catch (error) {
       response(id, {
         content: [{

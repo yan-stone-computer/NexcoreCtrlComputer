@@ -49,4 +49,6 @@ test("MCP exposes one compact computer tool", async () => {
   assert.ok(modes.includes("program_save"));
   assert.ok(modes.includes("program_list"));
   assert.ok(modes.includes("program_run"));
+  assert.ok(list.result.tools[0].inputSchema.properties.view.enum.includes("visual"));
+  assert.ok(list.result.tools[0].inputSchema.properties.target.anyOf[1].properties.frameId);
 });

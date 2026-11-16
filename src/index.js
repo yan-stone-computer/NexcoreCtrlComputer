@@ -1,10 +1,16 @@
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ProgramRuntime, ProgramStore } from "./programs.js";
+import {
+  createVisualFrame,
+  resolveVisualPoint,
+  visualFrameExpired,
+  visualFrameText
+} from "./visual.js";
 import { WindowsMcpBridge } from "./windows-mcp.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -554,6 +560,7 @@ export class Computer {
     this.programStore = new ProgramStore({ directory: options.programDir });
     this.programRuntime = new ProgramRuntime(this, this.programStore);
     this.windowsMcp = new WindowsMcpBridge(options.windowsMcp || {});
+    this.visualFrames = new Map();
     this.previous = new Map();
     this.activeSurface = "desktop";
     this.closed = false;
@@ -638,7 +645,7 @@ export class Computer {
         policy: "semantic-first"
       },
       capabilities: {
-        observe: ["software", "adapters", "semantic", "windows", "displays", "apps", "notifications", "surfaces", "browser"],
+        observe: ["software", "adapters", "semantic", "windows", "displays", "apps", "notifications", "surfaces", "visual", "browser"],
         act: [
           "open", "click", "double_click", "right_click", "hover", "focus", "fill", "type",
           "press", "select", "check", "uncheck", "toggle", "expand", "collapse", "scroll",
@@ -646,7 +653,7 @@ export class Computer {
           "window_maximize", "window_restore", "clipboard_get", "clipboard_set", "clipboard_clear"
         ],
         verify: ["value", "text", "title", "url", "html", "exists"],
-        safeguards: ["approval", "allowed-apps", "allowed-domains", "semantic-refs", "retry-disposition"]
+        safeguards: ["approval", "allowed-apps", "allowed-domains", "semantic-refs", "visual-frame-lease", "retry-disposition"]
       },
       routes: [
         {
@@ -984,6 +991,182 @@ export class Computer {
     };
   }
 
+  async _visualView(input) {
+    if (input.app) {
+      throw new NexcoreError(
+        "VISUAL_APP_FRAME_UNSUPPORTED",
+        "Visual frames currently capture the full desktop. Omit app and use activeWindow metadata to confirm context.",
+        { retry: "safe" }
+      );
+    }
+    const imagePath = resolve(input.path || defaultScreenshotPath(`nexcore-visual-${Date.now()}.png`));
+    const displayResponse = await this._desktop(["list-displays"]);
+    const displays = Array.isArray(displayResponse.data)
+      ? displayResponse.data
+      : displayResponse.data?.displays || [];
+    const requestedMonitor = String(input.monitorId ?? input.monitor ?? "").trim();
+    const display = displays.find(item => requestedMonitor && String(item.id) === requestedMonitor)
+      || displays.find(item => item.is_primary === true)
+      || displays[0];
+    if (!display) {
+      throw new NexcoreError("DISPLAY_UNAVAILABLE", "No display metadata was returned for the visual frame.", {
+        retry: "safe"
+      });
+    }
+    const displayIndex = Math.max(0, displays.indexOf(display));
+    const [response, windowResponse] = await Promise.all([
+      this._desktop(["screenshot", imagePath, "--screen", String(displayIndex)]),
+      this._desktop(["list-windows"]).catch(() => ({ data: [] }))
+    ]);
+    const windows = Array.isArray(windowResponse.data)
+      ? windowResponse.data
+      : windowResponse.data?.windows || [];
+    const activeWindow = windows.find(item => item.is_focused === true) || null;
+    const ttlMs = Math.max(1000, Math.min(120000, Number(input.frameTtlMs) || 30000));
+    const frame = createVisualFrame({
+      bytes: readFileSync(imagePath),
+      imagePath,
+      display,
+      activeWindow,
+      grid: input.grid || { columns: input.gridColumns, rows: input.gridRows },
+      ttlMs
+    });
+    const previewPath = imagePath.replace(/\.png$/i, ".preview.jpg");
+    let preview = null;
+    try {
+      preview = await this._pyautogui({
+        action: "preview",
+        inputPath: imagePath,
+        outputPath: previewPath,
+        maxWidth: input.previewMaxWidth || 1600,
+        quality: input.previewQuality || 82,
+        timeoutMs: this.config.timeoutMs
+      });
+    } catch {
+      // The full-resolution frame remains usable when Pillow is unavailable.
+    }
+    this.visualFrames.set(frame.frameId, frame);
+    while (this.visualFrames.size > 8) this.visualFrames.delete(this.visualFrames.keys().next().value);
+    const text = visualFrameText(frame)
+      + (preview ? `\npreview=${preview.path} ${preview.width}x${preview.height} ${preview.mimeType}` : "");
+    return {
+      surface: "desktop",
+      view: "visual",
+      text,
+      frameId: frame.frameId,
+      imagePath: preview?.path || frame.imagePath,
+      sourcePath: frame.imagePath,
+      mimeType: preview?.mimeType || frame.mimeType,
+      imageWidth: preview?.width || frame.width,
+      imageHeight: preview?.height || frame.height,
+      sourceWidth: frame.width,
+      sourceHeight: frame.height,
+      display: frame.display,
+      activeWindow: frame.activeWindow,
+      grid: frame.grid,
+      createdAt: frame.createdAt,
+      expiresAt: frame.expiresAt,
+      inlineImage: input.inlineImage !== false,
+      bytes: Buffer.byteLength(text, "utf8"),
+      estimatedTokens: estimateTokens(text),
+      elapsedMs: response.elapsedMs,
+      receipt: controlReceipt("observe", {
+        surface: "desktop",
+        engine: "desktop",
+        strategy: "visual-frame",
+        delivery: "observed",
+        retry: "safe",
+        verified: true,
+        revision: frame.frameId.slice(0, 12)
+      })
+    };
+  }
+
+  async _resolveVisualTarget(target, input = {}) {
+    this.policy.requireCoordinates();
+    const frame = this.visualFrames.get(String(target.frameId || ""));
+    if (!frame) {
+      throw new NexcoreError("VISUAL_FRAME_UNKNOWN", "Unknown visual frame; capture observe({view:'visual'}) first.", {
+        retry: "safe"
+      });
+    }
+    const maxAgeMs = Math.max(1000, Math.min(120000, Number(input.frameMaxAgeMs) || frame.expiresAt - frame.createdAt));
+    const now = Date.now();
+    if (visualFrameExpired(frame, now) || now - frame.createdAt > maxAgeMs) {
+      this.visualFrames.delete(frame.frameId);
+      throw new NexcoreError("VISUAL_FRAME_EXPIRED", "Visual frame expired; capture a fresh screenshot.", {
+        details: { frameId: frame.frameId, createdAt: frame.createdAt, maxAgeMs },
+        retry: "safe"
+      });
+    }
+    if (frame.activeWindow?.id !== undefined) {
+      const response = await this._desktop(["list-windows"]);
+      const windows = Array.isArray(response.data) ? response.data : response.data?.windows || [];
+      const active = windows.find(item => item.is_focused === true);
+      if (!active || String(active.id) !== String(frame.activeWindow.id)) {
+        throw new NexcoreError("VISUAL_FRAME_STALE", "The active window changed since this visual frame was captured.", {
+          details: {
+            frameWindow: frame.activeWindow,
+            activeWindow: active ? { id: active.id, title: active.title } : null
+          },
+          retry: "safe"
+        });
+      }
+    }
+    return { frame, ...resolveVisualPoint(frame, target) };
+  }
+
+  async _visualPointerAction(input, action, visual) {
+    const payload = action === "hover"
+      ? { action: "move", x: visual.screenPoint.x, y: visual.screenPoint.y, timeoutMs: this.config.timeoutMs }
+      : {
+          action: "click",
+          x: visual.screenPoint.x,
+          y: visual.screenPoint.y,
+          button: action === "right_click" ? "right" : "left",
+          clicks: action === "double_click" ? 2 : 1,
+          timeoutMs: this.config.timeoutMs
+        };
+    let data;
+    let engine = "pyautogui";
+    try {
+      data = await this._pyautogui(payload);
+    } catch (fallbackError) {
+      try {
+        const text = await this.windowsMcp.call("Click", {
+          loc: [visual.screenPoint.x, visual.screenPoint.y],
+          button: action === "right_click" ? "right" : "left",
+          clicks: action === "hover" ? 0 : action === "double_click" ? 2 : 1
+        });
+        data = { success: true, text };
+        engine = "windows-mcp";
+      } catch {
+        throw fallbackError;
+      }
+    }
+    const result = actionResult("desktop", action, data, {
+      strategy: visual.strategy,
+      frameId: visual.frameId,
+      screenPoint: visual.screenPoint,
+      imagePoint: visual.imagePoint,
+      normalized: visual.normalized
+    });
+    result.delivery = "delivered_unverified";
+    result.retry = "unsafe";
+    result.receipt.route.engine = engine;
+    result.receipt.effect.delivery = result.delivery;
+    if (input.expect) {
+      result.verification = await this.verify({
+        ...input.expect,
+        surface: "desktop"
+      });
+      if (result.verification.ok) result.delivery = "delivered_verified";
+      result.receipt.effect.delivery = result.delivery;
+      result.receipt.evidence.verified = Boolean(result.verification.ok);
+    }
+    return result;
+  }
+
   async _windowApp(input) {
     if (input.app) {
       const app = this._canonicalApp(input, input.action || "observe");
@@ -1209,7 +1392,7 @@ export class Computer {
       surface = "browser";
     } else if (
       DESKTOP_VIEWS[view]
-      || ["software", "installed", "adapters", "semantic", "window", "tree", "accessibility"].includes(view)
+      || ["software", "installed", "adapters", "semantic", "window", "tree", "accessibility", "visual"].includes(view)
       || input.app
       || windowId
       || windowTitle
@@ -1267,6 +1450,9 @@ export class Computer {
         viewed.bytes = Buffer.byteLength(viewed.text, "utf8");
         viewed.estimatedTokens = estimateTokens(viewed.text);
         return viewed;
+      }
+      if (requestedView === "visual") {
+        return this._visualView(input);
       }
       try {
         const viewed = await this._desktopView(input);
@@ -1582,7 +1768,24 @@ export class Computer {
       input.app = this._canonicalApp(input, action);
       this.policy.checkApp(input.app);
     }
+    let visual = null;
+    if (surface === "desktop" && input.target?.frameId) {
+      if (!["click", "double_click", "right_click", "hover"].includes(action)) {
+        throw new NexcoreError("VISUAL_ACTION_UNSUPPORTED", `Visual frames do not support ${action}.`, {
+          details: { supported: ["click", "double_click", "right_click", "hover"] },
+          retry: "safe"
+        });
+      }
+      visual = await this._resolveVisualTarget(input.target, input);
+      input = {
+        ...input,
+        headed: true,
+        target: { x: visual.screenPoint.x, y: visual.screenPoint.y }
+      };
+    }
     this.policy.requireHeaded(action, input.headed);
+
+    if (visual) return this._visualPointerAction(input, action, visual);
 
     if (action === "coordinate_click") {
       this.policy.requireCoordinates();
@@ -2042,6 +2245,8 @@ export class Computer {
       this.windowsMcp.close(),
       this._run(this.config.browserBin, ["--json", "--session", this.config.session, "close"], { timeoutMs: 5000 })
     ]);
+    this.visualFrames.clear();
+    this.previous.clear();
   }
 }
 

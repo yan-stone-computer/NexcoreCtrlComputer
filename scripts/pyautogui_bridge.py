@@ -12,6 +12,36 @@ def main() -> int:
         print(json.dumps({"ok": False, "code": "INVALID_INPUT", "message": str(exc)}))
         return 2
 
+    action = request.get("action")
+    if action == "preview":
+        try:
+            from PIL import Image
+            source = str(request["inputPath"])
+            target = str(request["outputPath"])
+            max_width = max(320, min(3840, int(request.get("maxWidth", 1600))))
+            quality = max(40, min(95, int(request.get("quality", 82))))
+            with Image.open(source) as image:
+                image = image.convert("RGB")
+                if image.width > max_width:
+                    height = max(1, round(image.height * max_width / image.width))
+                    image = image.resize((max_width, height), Image.Resampling.LANCZOS)
+                image.save(target, "JPEG", quality=quality, optimize=True)
+                result = {
+                    "path": target,
+                    "width": image.width,
+                    "height": image.height,
+                    "mimeType": "image/jpeg",
+                }
+            print(json.dumps({"ok": True, "data": result}, ensure_ascii=False))
+            return 0
+        except Exception as exc:
+            print(json.dumps({
+                "ok": False,
+                "code": "PREVIEW_UNAVAILABLE",
+                "message": str(exc),
+            }))
+            return 4
+
     try:
         import pyautogui
     except Exception as exc:
@@ -27,8 +57,6 @@ def main() -> int:
     # accessibility actions are preferred and coordinate use is opt-in.
     pyautogui.FAILSAFE = True
     pyautogui.PAUSE = 0
-
-    action = request.get("action")
     try:
         if action == "status":
             size = pyautogui.size()
@@ -46,7 +74,18 @@ def main() -> int:
             width, height = pyautogui.size()
             if not (0 <= x < width and 0 <= y < height):
                 raise ValueError("coordinates are outside the primary display")
-            pyautogui.click(x, y)
+            clicks = max(1, min(3, int(request.get("clicks", 1))))
+            button = str(request.get("button", "left"))
+            if button not in {"left", "middle", "right"}:
+                raise ValueError("button must be left, middle, or right")
+            pyautogui.click(x, y, clicks=clicks, button=button)
+            result = {"x": x, "y": y, "clicks": clicks, "button": button}
+        elif action == "move":
+            x, y = int(request["x"]), int(request["y"])
+            width, height = pyautogui.size()
+            if not (0 <= x < width and 0 <= y < height):
+                raise ValueError("coordinates are outside the primary display")
+            pyautogui.moveTo(x, y)
             result = {"x": x, "y": y}
         elif action == "type":
             pyautogui.write(str(request.get("text", "")), interval=0)

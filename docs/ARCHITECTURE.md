@@ -45,6 +45,23 @@ UIA / AX / AT-SPI  CDP
    scopes through a named ancestor when context is required, then falls back to
    bounded snapshots. Visual fallback is never automatic.
 
+## Visual-frame fallback
+
+Visual control is an explicit fallback for surfaces that expose no useful
+accessibility tree. `observe({ view: "visual" })` captures one full-desktop PNG,
+returns it to MCP clients, and records a short-lived frame contract:
+
+- SHA-256 frame identity and expiry;
+- active window identity;
+- physical image dimensions, display bounds, and display scale;
+- a labeled normalized grid whose cells map safely to physical coordinates.
+
+Pointer actions accept `{ frameId, cell }` or `{ frameId, normalized }`. Before
+input, the runtime rejects unknown/expired frames and frames whose active window
+changed. It then maps the normalized point to physical display coordinates and
+returns the mapping in the control receipt. The first implementation rejects
+app-scoped screenshots because their screen origin has not yet been proven.
+
 ## Backend ownership
 
 NexcoreCtrlComputer owns orchestration, compaction, policy, verification, and

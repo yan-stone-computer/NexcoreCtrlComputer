@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.0 - 2026-11-16
+
+- Added short-lived full-desktop visual frames with SHA-256 identity and active-window matching.
+- Added DPI-safe grid and normalized coordinate mapping for visual pointer actions.
+- Added click, double-click, right-click, and hover targets bound to a visual frame.
+- Added compact MCP image previews while retaining the full-resolution source screenshot.
+- Added visual frame, coordinate mapping, expiry, stale-window, and pointer regression tests.
+
 ## 0.4.1 - 2026-11-15
 
 - Added installed Start Menu software inventory with exact launch names and AUMIDs.

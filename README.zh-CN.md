@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./assets/hero-v040.svg" alt="NexcoreCtrlComputer 0.4.1 桌面与浏览器控制流程" width="100%">
+  <img src="./assets/hero-v040.svg" alt="NexcoreCtrlComputer 0.5.0 桌面与浏览器控制流程" width="100%">
 </p>
 
 <h1 align="center">NexcoreCtrlComputer</h1>
@@ -18,6 +18,17 @@ JS/CLI/MCP 契约控制桌面和浏览器，在本地完成无障碍目标定位
 它既可以执行一次语义动作，也可以保存参数化 UI 程序。底层使用
 **agent-desktop**、**agent-browser** 和显式开启的 PyAutoGUI 兜底；它不是
 一个独立的桌面软件。
+
+## 0.5.0 增加了什么
+
+`0.5.0` 增加受控的视觉帧兜底，专门处理 Canvas、游戏、远程桌面和没有可用
+无障碍树的自绘界面：
+
+- `observe({ view: "visual" })` 抓取全桌面帧，并生成紧凑 MCP 预览。
+- 每个动作绑定 30 秒有效的 SHA-256 `frameId`，窗口发生变化后拒绝执行。
+- 网格和归一化坐标通过显示器 bounds/DPI 映射到物理像素。
+- `click`、`double_click`、`right_click`、`hover` 可直接使用 `{ frameId, cell }`。
+- 原始 PNG 保留用于局部放大，MCP 默认只收到 1600px JPEG 预览。
 
 ## 0.4.1 增加了什么
 

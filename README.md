@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./assets/hero-v040.svg" alt="NexcoreCtrlComputer 0.4.1 desktop and browser control flow" width="100%">
+  <img src="./assets/hero-v040.svg" alt="NexcoreCtrlComputer 0.5.0 desktop and browser control flow" width="100%">
 </p>
 
 <h1 align="center">NexcoreCtrlComputer</h1>
@@ -12,7 +12,7 @@
 <p align="center">
   <a href="https://github.com/yan-stone-computer/NexcoreCtrlComputer/actions/workflows/ci.yml"><img alt="ci" src="https://github.com/yan-stone-computer/NexcoreCtrlComputer/actions/workflows/ci.yml/badge.svg"></a>
   <a href="https://m8ven.ai/mcp/yan-stone-computer-nexcorectrlcomputer-1idakx?s=readme"><img alt="M8ven Live" src="https://m8ven.ai/badge/mcp/yan-stone-computer-nexcorectrlcomputer-1idakx?variant=verified"></a>
-  <img alt="status" src="https://img.shields.io/badge/status-v0.4%20alpha-f59e0b">
+  <img alt="status" src="https://img.shields.io/badge/status-v0.5%20alpha-f59e0b">
   <img alt="node" src="https://img.shields.io/badge/node-%3E%3D20-339933">
   <img alt="runtime dependencies" src="https://img.shields.io/badge/runtime%20deps-0-16a34a">
   <img alt="license" src="https://img.shields.io/badge/license-MIT-2563eb">
@@ -29,7 +29,19 @@ The durable unit can be a one-off semantic action or a parameterized UI program.
 The kernel is built on **agent-desktop**, **agent-browser**, and an explicitly
 gated PyAutoGUI fallback. It is not a standalone desktop app.
 
-## What changed in 0.4.1
+## What changed in 0.5.0
+
+`0.5.0` adds a bounded visual-frame fallback for surfaces that expose no useful
+accessibility tree:
+
+- Full-desktop frames retain the source PNG and return a compact MCP preview.
+- A short-lived SHA-256 frame id binds every pointer action to a captured state.
+- An 8x6 labeled grid and normalized coordinates map through display bounds and
+  DPI instead of mixing screenshot, CSS, and logical pixels.
+- Click, double-click, right-click, and hover accept `{ frameId, cell }`.
+- Expired frames and actions after an active-window change fail closed.
+
+## Previously in 0.4.1
 
 `0.4.1` adds installed-software discovery and an adapter registry on top of the
 `0.4.0` layered Windows fallback:
@@ -163,6 +175,42 @@ proof. A previous browser session cannot silently capture a later
 | Inspect Calculator controls | `observe({ app: "CalculatorApp.exe", query: "7" })` |
 | Continue working in the active page | `observe({ surface: "browser" })` |
 | Open a URL and inspect it | `observe({ surface: "browser", url: "https://..." })` |
+| Locate an unlabeled control visually | `observe({ view: "visual" })` |
+
+## Visual frames: a bounded fallback
+
+Visual frames cover canvas, games, remote desktops, and custom-drawn interfaces
+that expose no usable accessibility tree. They are not the default route.
+
+```json
+{ "view": "visual", "grid": { "columns": 8, "rows": 6 } }
+```
+
+The response includes a PNG frame, physical image dimensions, display bounds and
+scale, the active window, a SHA-256 `frameId`, and a labeled grid. Columns run
+`A` to `H` left-to-right and rows run `1` to `6` top-to-bottom. MCP clients receive
+the screenshot as image content while CLI/JS callers receive the local path.
+The source PNG stays available for zooming; MCP receives an automatically
+downscaled 1600px JPEG preview so a 4K desktop does not become a multi-megabyte
+tool response.
+
+```json
+{
+  "action": "click",
+  "target": { "frameId": "<frameId>", "cell": "C4", "at": { "x": 0.5, "y": 0.5 } },
+  "expect": { "property": "exists", "target": { "role": "status", "name": "Saved" } }
+}
+```
+
+`click`, `double_click`, `right_click`, and `hover` reuse the same visual target.
+The controller requires both `allowCoordinates` and `allowHeaded`, checks frame
+expiry, and rejects the action if the active window changed. Coordinates are
+mapped from normalized image space to physical display space, so per-monitor DPI
+and negative monitor origins do not get mixed with CSS/logical pixels.
+
+Frames expire after 30 seconds by default. The current implementation captures
+the full desktop; app/window-scoped visual frames are deliberately rejected until
+their coordinate origin can be proven.
 
 ## 30-second demo
 
@@ -172,7 +220,7 @@ cd NexcoreCtrlComputer
 npm install
 npm link
 npm install -g agent-desktop agent-browser
-python -m pip install pyautogui                          # optional fallback
+python -m pip install -r requirements-coordinate.txt     # optional visual/coordinate fallback
 nexcore doctor
 
 nexcore observe '{"view":"windows"}'
