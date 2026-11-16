@@ -11,7 +11,7 @@
 
 <p align="center">
   <a href="https://github.com/yan-stone-computer/NexcoreCtrlComputer/actions/workflows/ci.yml"><img alt="ci" src="https://github.com/yan-stone-computer/NexcoreCtrlComputer/actions/workflows/ci.yml/badge.svg"></a>
-  <a href="https://m8ven.ai/mcp/yan-stone-computer-nexcorectrlcomputer-1idakx?s=readme"><img alt="M8ven Score" src="https://m8ven.ai/badge/mcp/yan-stone-computer-nexcorectrlcomputer-1idakx?v=dca0a2a5c0ce6c3ce41a94689057cde2"></a>
+  <a href="https://m8ven.ai/mcp/yan-stone-computer-nexcorectrlcomputer-1idakx?s=readme"><img alt="M8ven Live" src="https://m8ven.ai/badge/mcp/yan-stone-computer-nexcorectrlcomputer-1idakx?variant=verified"></a>
   <img alt="status" src="https://img.shields.io/badge/status-v0.4%20alpha-f59e0b">
   <img alt="node" src="https://img.shields.io/badge/node-%3E%3D20-339933">
   <img alt="runtime dependencies" src="https://img.shields.io/badge/runtime%20deps-0-16a34a">
