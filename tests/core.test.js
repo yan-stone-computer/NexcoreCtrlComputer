@@ -8,6 +8,7 @@ import {
   estimateTokens,
   normalizeRefsForDiff
 } from "../src/index.js";
+import { WindowsMcpBridge } from "../src/windows-mcp.js";
 
 const fixture = {
   app: "Calculator",
@@ -212,6 +213,22 @@ test("focused text and key sequences use Windows-MCP input", async () => {
   assert.deepEqual(sequence, ["6", "4", "2", "*", "5", "3", "2", "="]);
   assert.equal(typed.receipt.route.strategy, "windows-mcp-focused-type");
   assert.equal(pressed.receipt.route.strategy, "windows-mcp-key-sequence");
+});
+
+test("modifier sequences are delivered as one chord while calculator keys stay sequential", async () => {
+  const bridge = new WindowsMcpBridge({ enabled: true });
+  const calls = [];
+  bridge.call = async (name, args) => {
+    calls.push({ name, args });
+    return "ok";
+  };
+
+  await bridge.pressSequence(["CTRL", "V"]);
+  assert.deepEqual(calls, [{ name: "Shortcut", args: { shortcut: "ctrl+v" } }]);
+
+  calls.length = 0;
+  await bridge.pressSequence(["6", "4", "2"]);
+  assert.deepEqual(calls.map(call => call.args.shortcut), ["6", "4", "2"]);
 });
 
 test("browser observation includes the active page title", async () => {

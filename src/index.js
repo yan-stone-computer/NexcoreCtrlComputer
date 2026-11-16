@@ -149,6 +149,9 @@ const ACTION_ALIASES = Object.freeze({
   focus_window: "window_focus",
   resize_window: "window_resize",
   move_window: "window_move",
+  minimize: "window_minimize",
+  maximize: "window_maximize",
+  restore: "window_restore",
   minimize_window: "window_minimize",
   maximize_window: "window_maximize",
   restore_window: "window_restore",
@@ -482,6 +485,7 @@ function canUseWindowsMcpFallback(error) {
 function keySequence(value) {
   if (Array.isArray(value)) return value.map(String);
   const text = String(value ?? "");
+  if (text.includes("+")) return [text];
   if (/^[0-9.+\-*/=]+$/.test(text) && text.length > 1) return [...text];
   return null;
 }
@@ -995,15 +999,11 @@ export class Computer {
   }
 
   async _visualView(input) {
-    if (input.app) {
-      throw new NexcoreError(
-        "VISUAL_APP_FRAME_UNSUPPORTED",
-        "Visual frames currently capture the full desktop. Omit app and use activeWindow metadata to confirm context.",
-        { retry: "safe" }
-      );
-    }
     const imagePath = resolve(input.path || defaultScreenshotPath(`nexcore-visual-${Date.now()}.png`));
-    const displayResponse = await this._desktop(["list-displays"]);
+    const [displayResponse, windowResponse] = await Promise.all([
+      this._desktop(["list-displays"]),
+      this._desktop(["list-windows"]).catch(() => ({ data: [] }))
+    ]);
     const displays = Array.isArray(displayResponse.data)
       ? displayResponse.data
       : displayResponse.data?.displays || [];
@@ -1017,19 +1017,70 @@ export class Computer {
       });
     }
     const displayIndex = Math.max(0, displays.indexOf(display));
-    const [response, windowResponse] = await Promise.all([
-      this._desktop(["screenshot", imagePath, "--screen", String(displayIndex)]),
-      this._desktop(["list-windows"]).catch(() => ({ data: [] }))
-    ]);
     const windows = Array.isArray(windowResponse.data)
       ? windowResponse.data
       : windowResponse.data?.windows || [];
-    const activeWindow = windows.find(item => item.is_focused === true) || null;
+    const requestedWindowId = input.windowId ?? input.window_id;
+    const requestedWindowTitle = input.windowTitle ?? input.window_title ?? input.title;
+    const requestedApp = input.app ? this._canonicalApp(input, "observe") : "";
+    let targetWindow = null;
+    if (requestedWindowId || requestedWindowTitle || requestedApp) {
+      if (requestedApp) this.policy.checkApp(requestedApp);
+      let matches = windows.filter(item =>
+        (requestedWindowId && String(item.id) === String(requestedWindowId))
+        || (requestedWindowTitle && String(item.title || "").includes(String(requestedWindowTitle)))
+        || (requestedApp && String(item.app_name || item.process_name || "").toLocaleLowerCase() === requestedApp.toLocaleLowerCase())
+      );
+      if (matches.length > 1) {
+        const focused = matches.filter(item => item.is_focused === true);
+        if (focused.length === 1) matches = focused;
+      }
+      if (matches.length !== 1) {
+        throw new NexcoreError(
+          matches.length ? "AMBIGUOUS_WINDOW" : "WINDOW_NOT_FOUND",
+          matches.length ? "More than one window matched the visual capture." : "No window matched the visual capture.",
+          {
+            details: {
+              windowId: requestedWindowId,
+              windowTitle: requestedWindowTitle,
+              app: requestedApp,
+              matches: matches.slice(0, 8)
+            },
+            retry: "safe"
+          }
+        );
+      }
+      targetWindow = matches[0];
+      if (!targetWindow.bounds) {
+        throw new NexcoreError("WINDOW_BOUNDS_UNAVAILABLE", "The selected window has no screen bounds.", {
+          details: { windowId: targetWindow.id, title: targetWindow.title },
+          retry: "safe"
+        });
+      }
+    }
+    const activeWindow = targetWindow || windows.find(item => item.is_focused === true) || null;
+    const capture = targetWindow
+      ? {
+          kind: "window",
+          windowId: targetWindow.id,
+          title: targetWindow.title,
+          app: targetWindow.app_name || targetWindow.process_name || "",
+          bounds: targetWindow.bounds
+        }
+      : {
+          kind: "display",
+          screenIndex: displayIndex,
+          bounds: display.bounds
+        };
+    const response = await this._desktop(targetWindow
+      ? ["screenshot", imagePath, "--window-id", String(targetWindow.id)]
+      : ["screenshot", imagePath, "--screen", String(displayIndex)]);
     const ttlMs = Math.max(1000, Math.min(120000, Number(input.frameTtlMs) || 30000));
     const frame = createVisualFrame({
       bytes: readFileSync(imagePath),
       imagePath,
       display,
+      capture,
       activeWindow,
       grid: input.grid || { columns: input.gridColumns, rows: input.gridRows },
       ttlMs
@@ -1125,9 +1176,14 @@ export class Computer {
         height: Number(bounds.height)
       };
     };
-    const display = frame.display.bounds;
+    const display = frame.capture?.bounds || frame.display.bounds;
     return desktopRecords(response.data, { interactiveOnly: true })
       .filter(node => node.ref_id)
+      .filter(node => {
+        const role = String(node.role || "").toLocaleLowerCase();
+        if (["menu", "menubar", "menuitem", "titlebar", "scrollbar", "separator"].includes(role)) return false;
+        return Boolean(node.name || node.value) || !["document", "group", "pane"].includes(role);
+      })
       .flatMap(node => {
         const bounds = boundsOf(node);
         if (!bounds) return [];
@@ -1266,7 +1322,22 @@ export class Computer {
         retry: "safe"
       });
     }
-    if (frame.activeWindow?.id !== undefined) {
+    if (frame.capture?.kind === "window" && frame.capture.windowId !== null) {
+      const response = await this._desktop(["list-windows"]);
+      const windows = Array.isArray(response.data) ? response.data : response.data?.windows || [];
+      const current = windows.find(item => String(item.id) === String(frame.capture.windowId));
+      const before = frame.capture.bounds;
+      const after = current?.bounds;
+      const moved = after && before && ["x", "y", "width", "height"].some(
+        key => Math.abs(Number(after[key]) - Number(before[key])) > 1
+      );
+      if (!current || moved) {
+        throw new NexcoreError("VISUAL_FRAME_STALE", "The captured window moved, resized, or closed.", {
+          details: { frameWindow: frame.capture, currentWindow: current || null },
+          retry: "safe"
+        });
+      }
+    } else if (frame.activeWindow?.id !== undefined) {
       const response = await this._desktop(["list-windows"]);
       const windows = Array.isArray(response.data) ? response.data : response.data?.windows || [];
       const active = windows.find(item => item.is_focused === true);
@@ -1346,28 +1417,7 @@ export class Computer {
     if (input.expect) {
       const expectedProperty = String(input.expect.property || "");
       if (["visual_changed", "changed"].includes(expectedProperty)) {
-        await new Promise(resolve => setTimeout(resolve, Math.max(0, Math.min(3000, Number(input.expect.timeoutMs) || 250))));
-        const afterPath = defaultScreenshotPath(`nexcore-visual-after-${Date.now()}.png`);
-        await this._desktop(["screenshot", afterPath]);
-        const afterId = createHash("sha256").update(readFileSync(afterPath)).digest("hex");
-        const changed = afterId !== visual.frame.frameId;
-        result.verification = {
-          ok: changed,
-          property: "visual_changed",
-          expected: true,
-          actual: changed,
-          beforeFrameId: visual.frame.frameId,
-          afterFrameId: afterId,
-          receipt: controlReceipt("verify", {
-            surface: "desktop",
-            engine: "desktop",
-            strategy: "visual-frame-diff",
-            delivery: changed ? "verified" : "not_delivered",
-            retry: changed ? "safe" : "unsafe",
-            verified: changed,
-            revision: afterId.slice(0, 12)
-          })
-        };
+        result.verification = await this._verifyVisualChange(visual.frame, input.expect);
       } else {
         result.verification = await this.verify({
           ...input.expect,
@@ -1378,6 +1428,73 @@ export class Computer {
       result.receipt.effect.delivery = result.delivery;
       result.receipt.evidence.verified = Boolean(result.verification.ok);
     }
+    return result;
+  }
+
+  async _verifyVisualChange(frame, expect = {}) {
+    await new Promise(resolve => setTimeout(resolve, Math.max(0, Math.min(3000, Number(expect.timeoutMs) || 250))));
+    const afterPath = defaultScreenshotPath(`nexcore-visual-after-${Date.now()}.png`);
+    const args = frame.capture?.kind === "window" && frame.capture.windowId !== null
+      ? ["screenshot", afterPath, "--window-id", String(frame.capture.windowId)]
+      : frame.capture?.kind === "display" && frame.capture.screenIndex !== null
+        ? ["screenshot", afterPath, "--screen", String(frame.capture.screenIndex)]
+        : ["screenshot", afterPath];
+    await this._desktop(args);
+    const afterId = createHash("sha256").update(readFileSync(afterPath)).digest("hex");
+    const changed = afterId !== frame.frameId;
+    return {
+      ok: changed,
+      property: "visual_changed",
+      expected: true,
+      actual: changed,
+      beforeFrameId: frame.frameId,
+      afterFrameId: afterId,
+      receipt: controlReceipt("verify", {
+        surface: "desktop",
+        engine: "desktop",
+        strategy: "visual-frame-diff",
+        delivery: changed ? "verified" : "not_delivered",
+        retry: changed ? "safe" : "unsafe",
+        verified: changed,
+        revision: afterId.slice(0, 12)
+      })
+    };
+  }
+
+  async _visualPasteAction(input, visual) {
+    const value = String(input.text ?? input.value ?? "");
+    if (!value) throw new NexcoreError("TEXT_REQUIRED", "paste needs text.", { retry: "safe" });
+    input = {
+      ...input,
+      expect: input.expect || { property: "visual_changed", timeoutMs: 350 }
+    };
+    const click = await this._visualPointerAction({ ...input, expect: undefined }, "click", visual);
+    const pasted = await this.windowsMcp.typeAtFocus(value);
+    const result = actionResult("desktop", "paste", {
+      success: true,
+      click: click.data,
+      text: pasted,
+      disposition: { delivery: "delivered_unverified", retry: "unsafe" }
+    }, {
+      strategy: `visual-paste:${visual.strategy}`,
+      frameId: visual.frameId,
+      screenPoint: visual.screenPoint,
+      normalized: visual.normalized,
+      bytes: Buffer.byteLength(value, "utf8")
+    });
+    result.delivery = "delivered_unverified";
+    result.retry = "unsafe";
+    result.receipt.route.engine = "windows-mcp";
+    if (input.expect) {
+      if (["visual_changed", "changed"].includes(String(input.expect.property || ""))) {
+        result.verification = await this._verifyVisualChange(visual.frame, input.expect);
+      } else {
+        result.verification = await this.verify({ ...input.expect, surface: "desktop" });
+      }
+      if (result.verification.ok) result.delivery = "delivered_verified";
+    }
+    result.receipt.effect.delivery = result.delivery;
+    result.receipt.evidence.verified = Boolean(result.verification?.ok);
     return result;
   }
 
@@ -1984,9 +2101,9 @@ export class Computer {
     }
     let visual = null;
     if (surface === "desktop" && (input.target?.frameId || input.target?.zoomId)) {
-      if (!["click", "double_click", "right_click", "hover"].includes(action)) {
+      if (!["click", "double_click", "right_click", "hover", "paste"].includes(action)) {
         throw new NexcoreError("VISUAL_ACTION_UNSUPPORTED", `Visual frames do not support ${action}.`, {
-          details: { supported: ["click", "double_click", "right_click", "hover"] },
+          details: { supported: ["click", "double_click", "right_click", "hover", "paste"] },
           retry: "safe"
         });
       }
@@ -1999,7 +2116,9 @@ export class Computer {
     }
     this.policy.requireHeaded(action, input.headed);
 
-    if (visual) return this._visualPointerAction(input, action, visual);
+    if (visual) return action === "paste"
+      ? this._visualPasteAction(input, visual)
+      : this._visualPointerAction(input, action, visual);
 
     if (action === "coordinate_click") {
       this.policy.requireCoordinates();

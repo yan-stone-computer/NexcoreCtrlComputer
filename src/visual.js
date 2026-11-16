@@ -100,6 +100,7 @@ export function createVisualFrame({
   bytes,
   imagePath,
   display,
+  capture = null,
   activeWindow = null,
   grid,
   createdAt = Date.now(),
@@ -109,6 +110,12 @@ export function createVisualFrame({
   if (!imagePath) throw visualError("VISUAL_IMAGE_MISSING", "Screenshot path is missing.");
   if (!display?.bounds || !Number.isFinite(Number(display.bounds.width)) || !Number.isFinite(Number(display.bounds.height))) {
     throw visualError("DISPLAY_UNAVAILABLE", "A display with finite bounds is required.");
+  }
+  const captureBounds = capture?.bounds || display.bounds;
+  if (!Number.isFinite(Number(captureBounds.x)) || !Number.isFinite(Number(captureBounds.y))
+    || !Number.isFinite(Number(captureBounds.width)) || !Number.isFinite(Number(captureBounds.height))
+    || Number(captureBounds.width) <= 0 || Number(captureBounds.height) <= 0) {
+    throw visualError("CAPTURE_UNAVAILABLE", "The capture needs finite positive bounds.");
   }
   const image = imageDimensions(bytes);
   const normalizedGrid = normalizeVisualGrid(grid);
@@ -129,6 +136,19 @@ export function createVisualFrame({
       },
       scale: Number(display.scale) || 1,
       isPrimary: display.is_primary === true
+    },
+    capture: {
+      kind: capture?.kind || "display",
+      windowId: capture?.windowId ?? null,
+      screenIndex: capture?.screenIndex ?? null,
+      title: String(capture?.title || ""),
+      app: String(capture?.app || ""),
+      bounds: {
+        x: Number(captureBounds.x),
+        y: Number(captureBounds.y),
+        width: Number(captureBounds.width),
+        height: Number(captureBounds.height)
+      }
     },
     activeWindow: activeWindow ? {
       id: activeWindow.id,
@@ -151,6 +171,7 @@ export function visualFrameExpired(frame, now = Date.now()) {
 
 export function resolveVisualPoint(frame, target = {}) {
   if (!frame?.display?.bounds || !frame?.grid) throw visualError("VISUAL_FRAME_INVALID", "Visual frame metadata is incomplete.");
+  const bounds = frame.capture?.bounds || frame.display.bounds;
   let normalized;
   let strategy;
   if (target.candidateId !== undefined) {
@@ -178,8 +199,8 @@ export function resolveVisualPoint(frame, target = {}) {
     y: Math.round(normalized.y * frame.height)
   };
   const screenPoint = {
-    x: Math.round(frame.display.bounds.x + normalized.x * frame.display.bounds.width),
-    y: Math.round(frame.display.bounds.y + normalized.y * frame.display.bounds.height)
+    x: Math.round(bounds.x + normalized.x * bounds.width),
+    y: Math.round(bounds.y + normalized.y * bounds.height)
   };
   return { frameId: frame.frameId, strategy, normalized, imagePoint, screenPoint };
 }
@@ -259,6 +280,7 @@ export function resolveVisualZoomPoint(zoom, target = {}) {
     y: zoom.normalized.y + local.y * zoom.normalized.height
   };
   const frame = zoom.frame;
+  const bounds = frame.capture?.bounds || frame.display.bounds;
   return {
     frameId: frame.frameId,
     zoomId: zoom.zoomId,
@@ -269,8 +291,8 @@ export function resolveVisualZoomPoint(zoom, target = {}) {
       y: Math.round(normalized.y * frame.height)
     },
     screenPoint: {
-      x: Math.round(frame.display.bounds.x + normalized.x * frame.display.bounds.width),
-      y: Math.round(frame.display.bounds.y + normalized.y * frame.display.bounds.height)
+      x: Math.round(bounds.x + normalized.x * bounds.width),
+      y: Math.round(bounds.y + normalized.y * bounds.height)
     }
   };
 }
@@ -283,6 +305,9 @@ export function visualFrameText(frame) {
   return [
     `visual frame ${frame.frameId.slice(0, 16)} · ${frame.width}x${frame.height} · ${frame.mimeType}`,
     `display=${frame.display.id || "unknown"} bounds=${frame.display.bounds.x},${frame.display.bounds.y},${frame.display.bounds.width},${frame.display.bounds.height} scale=${frame.display.scale}`,
+    frame.capture?.kind === "window"
+      ? `capture=window ${frame.capture.windowId} "${frame.capture.title}" bounds=${frame.capture.bounds.x},${frame.capture.bounds.y},${frame.capture.bounds.width},${frame.capture.bounds.height}`
+      : "capture=display",
     window,
     `grid=${frame.grid.columns}x${frame.grid.rows} · columns A-${columnName(frame.grid.columns - 1)} left-to-right · rows 1-${frame.grid.rows} top-to-bottom · cells A1-${maxCell}`,
     `expiresAt=${new Date(frame.expiresAt).toISOString()}`,

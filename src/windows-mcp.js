@@ -187,8 +187,12 @@ export class WindowsMcpBridge {
   }
 
   async pressSequence(keys) {
+    const values = keys.map((value) => String(value).trim()).filter(Boolean);
+    if (values.length > 1 && /^(ctrl|control|alt|shift|win|meta|cmd|command)$/i.test(values[0])) {
+      return this.press(values.join("+").toLowerCase());
+    }
     const results = [];
-    for (const raw of keys) {
+    for (const raw of values) {
       const key = raw === "*" ? "shift+8" : raw === "=" ? "return" : String(raw);
       results.push(await this.press(key));
     }

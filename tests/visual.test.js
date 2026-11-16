@@ -44,6 +44,26 @@ test("visual frames map grid cells to display coordinates", () => {
   assert.equal(point.strategy, "visual-cell:C2");
 });
 
+test("window visual frames map points to the window instead of the full display", () => {
+  const frame = createVisualFrame({
+    bytes: PNG_1X1,
+    imagePath: "frame.png",
+    display: { id: "monitor-1", bounds: { x: 0, y: 0, width: 2560, height: 1440 } },
+    capture: {
+      kind: "window",
+      windowId: "w-1",
+      bounds: { x: 600, y: 200, width: 1000, height: 800 }
+    },
+    grid: { columns: 8, rows: 6 }
+  });
+  frame.width = 800;
+  frame.height = 600;
+
+  const point = resolveVisualPoint(frame, { normalized: { x: 0.5, y: 0.25 } });
+  assert.deepEqual(point.screenPoint, { x: 1100, y: 400 });
+  assert.equal(frame.capture.kind, "window");
+});
+
 test("visual frame validation rejects unsupported grids and reports expiry", () => {
   assert.deepEqual(normalizeVisualGrid(), { columns: 8, rows: 6 });
   assert.throws(() => normalizeVisualGrid({ columns: 1, rows: 6 }), /columns/);
@@ -116,6 +136,42 @@ test("visual pointer actions use a live frame and the mapped physical point", as
   );
   assert.equal(result.delivery, "delivered_unverified");
   assert.equal(result.receipt.route.strategy, "visual-cell:D2");
+});
+
+test("visual paste clicks once and hands the full text to the clipboard bridge", async () => {
+  const frame = createVisualFrame({
+    bytes: PNG_1X1,
+    imagePath: "frame.png",
+    display: { id: "monitor-1", bounds: { x: 0, y: 0, width: 1920, height: 1080 } },
+    activeWindow: { id: 7, title: "WorkBuddy", bounds: { x: 0, y: 0, width: 1200, height: 800 } },
+    grid: { columns: 8, rows: 6 }
+  });
+  const controller = Object.create(Computer.prototype);
+  controller.closed = false;
+  controller.activeSurface = "desktop";
+  controller.config = { timeoutMs: 1000 };
+  controller.policy = new ActionPolicy({ allowCoordinates: true, allowHeaded: true });
+  controller.visualFrames = new Map([[frame.frameId, frame]]);
+  controller._desktop = async () => ({ data: [{ id: 7, is_focused: true }] });
+  controller._pyautogui = async value => ({ x: value.x, y: value.y });
+  controller._verifyVisualChange = async () => ({ ok: true, property: "visual_changed", actual: true });
+  let pasted = "";
+  controller.windowsMcp = {
+    async typeAtFocus(text) {
+      pasted = text;
+      return "ctrl+v";
+    }
+  };
+
+  const result = await controller.act({
+    action: "paste",
+    target: { frameId: frame.frameId, cell: "D4" },
+    text: "完整的长任务提示词"
+  });
+
+  assert.equal(pasted, "完整的长任务提示词");
+  assert.match(result.receipt.route.strategy, /visual-paste/);
+  assert.equal(result.delivery, "delivered_verified");
 });
 
 test("visual pointer actions reject a frame after the active window changes", async () => {
