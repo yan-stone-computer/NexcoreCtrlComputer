@@ -23,5 +23,13 @@ https://github.com/asweigart/pyautogui
 License: BSD-3-Clause
 Use: explicitly enabled coordinate fallback for canvas or inaccessible UI.
 
+Windows-MCP
+https://github.com/CursorTouch/Windows-MCP
+License: MIT
+Use: capability and interaction semantics for Windows inventory, window
+management, clipboard, and verification. NexcoreCtrlComputer integrates those
+capabilities into one control contract and does not launch Windows-MCP's MCP
+server or expose its tool names directly to the model.
+
 See each upstream project for its complete license, notices, security guidance,
 and platform requirements.

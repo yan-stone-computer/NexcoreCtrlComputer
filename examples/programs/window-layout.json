@@ -1,0 +1,30 @@
+{
+  "schema": "nexcore.program/v1",
+  "name": "desktop.window-layout",
+  "version": "1.0.0",
+  "description": "Focus a desktop window, resize it to a predictable working area, and verify the target control remains available.",
+  "params": {
+    "windowId": {
+      "type": "string",
+      "required": true
+    }
+  },
+  "steps": [
+    {
+      "act": {
+        "surface": "desktop",
+        "action": "window_focus",
+        "windowId": "{{windowId}}"
+      }
+    },
+    {
+      "act": {
+        "surface": "desktop",
+        "action": "window_resize",
+        "windowId": "{{windowId}}",
+        "width": 1280,
+        "height": 800
+      }
+    }
+  ]
+}

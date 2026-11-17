@@ -182,10 +182,43 @@ test("software inventory and adapter registry are separate from running apps", a
 
   assert.equal(software.count, 1);
   assert.equal(software.items[0].launchAdapter, "windows-mcp");
+  assert.deepEqual(software.items[0].launch, {
+    adapter: "apps-folder",
+    app: "计算器",
+    appId: "Microsoft.WindowsCalculator_8wekyb3d8bbwe!App"
+  });
   assert.ok(software.items[0].controlAdapters.includes("agent-desktop"));
   assert.equal(adapters.view, "adapters");
   assert.match(adapters.text, /windows-mcp/i);
   assert.match(adapters.text, /libreoffice: available/);
+});
+
+test("catalog AUMID launches bypass desktop process-name guessing", async () => {
+  const computer = new Computer({ desktopBin: "unused", browserBin: "unused" });
+  let received = {};
+  computer._launchSoftware = async input => {
+    received = input;
+    return {
+      data: {
+        success: true,
+        text: "Opened shell:AppsFolder\\Chrome.Example",
+        disposition: { delivery: "delivered_unverified", retry: "unsafe" }
+      },
+      elapsedMs: 0,
+      engine: "windows-shell",
+      strategy: "apps-folder"
+    };
+  };
+
+  const opened = await computer.act({
+    action: "open_app",
+    app: "Google Chrome",
+    appId: "Chrome.Example"
+  });
+
+  assert.equal(received.appId, "Chrome.Example");
+  assert.equal(opened.receipt.route.engine, "windows-shell");
+  assert.equal(opened.receipt.route.strategy, "apps-folder");
 });
 
 test("focused text and key sequences use Windows-MCP input", async () => {

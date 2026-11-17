@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="620" viewBox="0 0 1600 620" role="img" aria-labelledby="title desc">
+  <title id="title">NexcoreCtrlComputer 0.6 control plane</title>
+  <desc id="desc">Agent intent enters one control plane that observes desktop and browser interfaces, resolves semantic targets, executes with guarded fallbacks, verifies the result, and returns a compact evidence receipt.</desc>
+  <defs>
+    <linearGradient id="hero-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f7fbfc"/>
+      <stop offset="1" stop-color="#edf7f9"/>
+    </linearGradient>
+    <linearGradient id="hero-accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#20b9c8"/>
+      <stop offset="1" stop-color="#73c96b"/>
+    </linearGradient>
+    <marker id="hero-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 10 5 0 10Z" fill="#0d7f96"/>
+    </marker>
+  </defs>
+  <rect width="1600" height="620" rx="34" fill="url(#hero-bg)"/>
+  <g font-family="Segoe UI, Microsoft YaHei, sans-serif">
+    <circle cx="86" cy="92" r="24" fill="url(#hero-accent)"/>
+    <path d="M74 99l12-16 12 16M79 99v9M93 99v9" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="126" y="99" font-size="20" font-weight="700" fill="#0b2b35">NexcoreCtrlComputer</text>
+    <text x="72" y="162" font-size="56" font-weight="750" fill="#0b1f27">Intent in.</text>
+    <text x="72" y="220" font-size="56" font-weight="750" fill="#0b1f27">Verified control out.</text>
+    <text x="74" y="254" font-size="20" fill="#486b76">One accessibility-first control plane for native apps and browser sessions.</text>
+
+    <g transform="translate(72 292)">
+      <rect width="188" height="62" rx="16" fill="#fff" stroke="#c8dfe5"/>
+      <text x="18" y="26" font-size="12" font-weight="700" fill="#0d7f96" letter-spacing="1">ONE CONTRACT</text>
+      <text x="18" y="48" font-size="15" fill="#17343d">JS · CLI · MCP · programs</text>
+    </g>
+    <g transform="translate(276 292)">
+      <rect width="188" height="62" rx="16" fill="#fff" stroke="#c8dfe5"/>
+      <text x="18" y="26" font-size="12" font-weight="700" fill="#0d7f96" letter-spacing="1">TWO SURFACES</text>
+      <text x="18" y="48" font-size="15" fill="#17343d">Desktop · Browser</text>
+    </g>
+    <g transform="translate(480 292)">
+      <rect width="210" height="62" rx="16" fill="#fff" stroke="#c8dfe5"/>
+      <text x="18" y="26" font-size="12" font-weight="700" fill="#0d7f96" letter-spacing="1">GATED FALLBACKS</text>
+      <text x="18" y="48" font-size="15" fill="#17343d">Semantic → visual → input</text>
+    </g>
+    <text x="74" y="398" font-size="16" font-weight="600" fill="#17343d">Every operation returns route, delivery, retry and verification evidence.</text>
+    <rect x="74" y="426" width="616" height="2" rx="1" fill="#cfe4e8"/>
+    <text x="74" y="466" font-size="14" fill="#58737d">Short-lived refs and frame digests prevent stale or ambiguous actions.</text>
+    <text x="74" y="493" font-size="14" fill="#58737d">Bounded snapshots keep UI trees and screenshots out of the model context.</text>
+    <text x="74" y="520" font-size="14" fill="#58737d">Reusable programs store intent and contracts, never coordinates or refs.</text>
+
+    <g transform="translate(760 78)">
+      <rect width="760" height="470" rx="28" fill="#0b2029"/>
+      <text x="34" y="43" font-size="12" font-weight="700" fill="#67d5e1" letter-spacing="1.4">CONTROL PLANE</text>
+      <rect x="34" y="66" width="692" height="70" rx="16" fill="#12313c" stroke="#26505d"/>
+      <text x="58" y="94" font-size="12" font-weight="700" fill="#76d8e2">INTENT</text>
+      <text x="58" y="117" font-size="15" fill="#d8edf1">Agent task · semantic program · typed parameters</text>
+
+      <g transform="translate(34 174)">
+        <rect width="150" height="98" rx="18" fill="#ffffff"/>
+        <text x="20" y="28" font-size="11" font-weight="700" fill="#0a829a" letter-spacing="1">01 OBSERVE</text>
+        <text x="20" y="56" font-size="16" font-weight="700" fill="#102a33">Bounded state</text>
+        <text x="20" y="78" font-size="12" fill="#58737d">trees · frames</text>
+      </g>
+      <g transform="translate(224 174)">
+        <rect width="150" height="98" rx="18" fill="#ffffff"/>
+        <text x="20" y="28" font-size="11" font-weight="700" fill="#0a829a" letter-spacing="1">02 RESOLVE</text>
+        <text x="20" y="56" font-size="16" font-weight="700" fill="#102a33">Exact target</text>
+        <text x="20" y="78" font-size="12" fill="#58737d">role · name · scope</text>
+      </g>
+      <g transform="translate(414 174)">
+        <rect width="150" height="98" rx="18" fill="#ffffff"/>
+        <text x="20" y="28" font-size="11" font-weight="700" fill="#0a829a" letter-spacing="1">03 ACT</text>
+        <text x="20" y="56" font-size="16" font-weight="700" fill="#102a33">Route action</text>
+        <text x="20" y="78" font-size="12" fill="#58737d">A11y · visual · CDP</text>
+      </g>
+      <g transform="translate(604 174)">
+        <rect width="122" height="98" rx="18" fill="#d9f5f1"/>
+        <text x="18" y="28" font-size="11" font-weight="700" fill="#0a7d75" letter-spacing="1">04 VERIFY</text>
+        <text x="18" y="56" font-size="16" font-weight="700" fill="#0b383b">Evidence</text>
+        <text x="18" y="78" font-size="12" fill="#41736d">postcondition</text>
+      </g>
+
+      <g fill="none" stroke="#52cbd8" stroke-width="2.2" marker-end="url(#hero-arrow)">
+        <path d="M184 223h28"/>
+        <path d="M374 223h28"/>
+        <path d="M564 223h28"/>
+      </g>
+
+      <rect x="34" y="310" width="338" height="126" rx="18" fill="#12313c" stroke="#26505d"/>
+      <text x="56" y="340" font-size="12" font-weight="700" fill="#70d6e2">DESKTOP PATH</text>
+      <text x="56" y="370" font-size="15" fill="#e5f4f6">Installed catalog → AUMID launch</text>
+      <text x="56" y="395" font-size="15" fill="#e5f4f6">Accessibility tree → semantic action</text>
+      <text x="56" y="420" font-size="15" fill="#e5f4f6">Window-scoped visual frame fallback</text>
+
+      <rect x="392" y="310" width="334" height="126" rx="18" fill="#12313c" stroke="#26505d"/>
+      <text x="414" y="340" font-size="12" font-weight="700" fill="#70d6e2">BROWSER PATH</text>
+      <text x="414" y="370" font-size="15" fill="#e5f4f6">CDP session → DOM/accessibility snapshot</text>
+      <text x="414" y="395" font-size="15" fill="#e5f4f6">Semantic or CSS target resolution</text>
+      <text x="414" y="420" font-size="15" fill="#e5f4f6">Navigation and text verification</text>
+    </g>
+
+    <path d="M722 315h38" fill="none" stroke="#0d7f96" stroke-width="3" marker-end="url(#hero-arrow)"/>
+    <text x="1310" y="590" text-anchor="end" font-size="12" fill="#6b858d">v0.6.0 · accessibility first · local evidence</text>
+  </g>
+</svg>

@@ -39,7 +39,12 @@ const ACTIONS = new Set([
   "toggle",
   "expand",
   "collapse",
-  "scroll"
+  "scroll",
+  "window_focus",
+  "window_resize",
+  "window_minimize",
+  "window_maximize",
+  "window_restore"
 ]);
 
 export class ProgramError extends Error {

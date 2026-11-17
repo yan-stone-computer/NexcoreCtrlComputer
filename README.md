@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./assets/hero-v040.svg" alt="NexcoreCtrlComputer 0.5.0 desktop and browser control flow" width="100%">
+  <img src="./assets/hero-v060.svg" alt="NexcoreCtrlComputer 0.6 control plane for desktop and browser automation" width="100%">
 </p>
 
 <h1 align="center">NexcoreCtrlComputer</h1>
@@ -12,7 +12,7 @@
 <p align="center">
   <a href="https://github.com/yan-stone-computer/NexcoreCtrlComputer/actions/workflows/ci.yml"><img alt="ci" src="https://github.com/yan-stone-computer/NexcoreCtrlComputer/actions/workflows/ci.yml/badge.svg"></a>
   <a href="https://m8ven.ai/mcp/yan-stone-computer-nexcorectrlcomputer-1idakx?s=readme"><img alt="M8ven Live" src="https://m8ven.ai/badge/mcp/yan-stone-computer-nexcorectrlcomputer-1idakx?variant=verified"></a>
-  <img alt="status" src="https://img.shields.io/badge/status-v0.5%20alpha-f59e0b">
+  <img alt="status" src="https://img.shields.io/badge/status-v0.6%20alpha-f59e0b">
   <img alt="node" src="https://img.shields.io/badge/node-%3E%3D20-339933">
   <img alt="runtime dependencies" src="https://img.shields.io/badge/runtime%20deps-0-16a34a">
   <img alt="license" src="https://img.shields.io/badge/license-MIT-2563eb">
@@ -26,12 +26,29 @@ accessibility targets locally, verifies important postconditions, and returns a
 compact receipt instead of dumping screenshots and raw UI trees into the model.
 
 The durable unit can be a one-off semantic action or a parameterized UI program.
-The kernel is built on **agent-desktop**, **agent-browser**, and an explicitly
-gated PyAutoGUI fallback. It is not a standalone desktop app.
+The kernel is built on **agent-desktop**, **Windows-MCP**, **agent-browser**,
+and an explicitly gated PyAutoGUI fallback. It is not a standalone desktop app.
 
-## What changed in 0.5.0
+## What changed in 0.6.0
 
-`0.5.0` adds a bounded visual-frame fallback for surfaces that expose no useful
+`0.6.0` synchronizes the public repository with the control kernel used by
+NexcoreWork 2.5.9 and makes the software-launch and long-running desktop paths
+explicit:
+
+- Installed applications launch by exact executable path or `shell:AppsFolder`
+  AUMID; Windows-MCP remains the fallback instead of guessing a process name.
+- `window_focus`, `window_resize`, `window_minimize`, `window_maximize`, and
+  `window_restore` are valid steps in reusable semantic programs.
+- TypeScript declarations ship with the package, including the computer,
+  policy, program, observation, action, and verification surfaces.
+- The architecture is now documented as one control plane with bounded
+  observation, target resolution, execution routing, postcondition proof, and
+  evidence receipts rather than a loose backend stack.
+- The README uses the new 0.6 hero and architecture figures.
+
+## Visual fallback added in 0.5.x
+
+`0.5.x` adds a bounded visual-frame fallback for surfaces that expose no useful
 accessibility tree:
 
 - Full-desktop frames retain the source PNG and return a compact MCP preview.
@@ -159,12 +176,21 @@ The latest five-round Windows UI test report is in
 
 ## Architecture
 
-![NexcoreCtrlComputer desktop and browser control architecture](./assets/architecture-v033.svg)
+![NexcoreCtrlComputer 0.6 control-plane architecture](./assets/architecture-v060.svg)
 
-The surface router keeps desktop and browser state explicit. The local runtime
-owns bounded observation, target resolution, policy, action execution, and state
-proof. A previous browser session cannot silently capture a later
-`observe({ view: "windows" })` call.
+The architecture is deliberately split into five contracts:
+
+| Layer | Responsibility | Fail-closed boundary |
+|---|---|---|
+| Client | Agent, MCP, JS, CLI, or saved program expresses intent | No backend-specific syntax escapes to the model |
+| Control plane | Normalize, scope, observe, resolve, route, verify, and receipt | Session policy and typed operations |
+| Grounding | Accessibility snapshot, installed catalog, browser state, visual frame | Stale refs, windows, and frames are rejected |
+| Execution | Semantic desktop/browser actions, window/clipboard/input, guarded fallback | No blind replay after an unsafe delivery |
+| Evidence | Value/text/URL/existence or `visual_changed` proof | Unknown remains unknown |
+
+Desktop and browser state stay explicit. A previous browser session cannot
+silently capture a later `observe({ view: "windows" })` call. Screenshots are
+not promoted to the primary route just because they are available.
 
 ## Which observation should I use?
 
@@ -172,10 +198,12 @@ proof. A previous browser session cannot silently capture a later
 |---|---|
 | Find an open desktop window | `observe({ view: "windows" })` |
 | List running desktop applications | `observe({ view: "apps" })` |
+| List launchable installed software and AUMIDs | `observe({ view: "software" })` |
 | Inspect Calculator controls | `observe({ app: "CalculatorApp.exe", query: "7" })` |
 | Continue working in the active page | `observe({ surface: "browser" })` |
 | Open a URL and inspect it | `observe({ surface: "browser", url: "https://..." })` |
 | Locate an unlabeled control visually | `observe({ view: "visual" })` |
+| Inspect available control engines | `observe({ view: "adapters" })` |
 
 ## Visual frames: a bounded fallback
 
@@ -311,7 +339,10 @@ Modes: `status`, `observe`, `act`, `run`, `program_save`, `program_list`,
 
 Actions: open, click, double-click, right-click, hover, focus, fill, type,
 press, select, check, uncheck, toggle, expand, collapse, scroll, window
-management, and clipboard read/write. Desktop inventory is available through
+management, and clipboard read/write. Desktop software results carry an exact
+`launch` descriptor; `appId` opens an AUMID or executable directly. Reusable
+programs may contain window-management actions, but still reject snapshot refs,
+pixels, and headed mode. Desktop inventory is available through
 `observe` views for windows, apps, displays, notifications, and surfaces. These
 views always return to the desktop route, even after a browser session.
 Coordinate click and screenshot remain explicit one-off actions and are rejected
@@ -389,6 +420,16 @@ await computer.verify({
   value: "https://www.iana.org/help/example-domains"
 });
 
+await computer.close();
+```
+
+Type declarations are included:
+
+```ts
+import { createComputer, type ComputerResult } from "nexcorectrlcomputer";
+
+const computer = await createComputer({ session: "typed-workflow" });
+const state: ComputerResult = await computer.observe({ view: "software" });
 await computer.close();
 ```
 
@@ -493,7 +534,9 @@ Validated on Windows with Node 24, `agent-desktop` 1.2.0,
 - live parameterized browser program save and verified replay
 - live cross-surface program spanning a Chromium page and a native app
 - browser-to-desktop inventory switching without session leakage
+- installed-software catalog launch through exact AUMIDs and executables
 - real Calculator launch, semantic button click, and accessible-text verification
+- reusable window focus, resize, minimize, maximize, and restore steps
 - MCP protocol smoke test
 - unit tests for compiler, storage, contextual resolution, and policies
 
@@ -511,6 +554,8 @@ NexcoreCtrlComputer is independent and does not vendor upstream source:
   automation and CDP snapshots, Apache-2.0
 - [PyAutoGUI](https://github.com/asweigart/pyautogui) - coordinate input and
   screenshot fallback, BSD-3-Clause
+- [Windows-MCP](https://github.com/CursorTouch/Windows-MCP) - Windows inventory,
+  launch, window, clipboard, and fallback interaction semantics, MIT
 
 See [NOTICE](./NOTICE) for the integration boundary.
 

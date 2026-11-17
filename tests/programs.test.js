@@ -104,6 +104,24 @@ test("compiler rejects cross-run refs, coordinates, and headed mode", () => {
   );
 });
 
+test("compiler accepts reusable window management steps", () => {
+  const result = compileProgram({
+    schema: "nexcore.program/v1",
+    name: "window.layout",
+    version: "1.0.0",
+    steps: [
+      { act: { surface: "desktop", action: "window_focus", windowId: "w-1" } },
+      { act: { surface: "desktop", action: "window_resize", width: 1280, height: 800 } },
+      { act: { surface: "desktop", action: "window_minimize" } }
+    ]
+  }, {});
+  assert.deepEqual(result.steps.map(step => step.act.action), [
+    "window_focus",
+    "window_resize",
+    "window_minimize"
+  ]);
+});
+
 test("program store saves, lists, and loads portable JSON", () => {
   const directory = mkdtempSync(join(tmpdir(), "nexcore-program-test-"));
   try {

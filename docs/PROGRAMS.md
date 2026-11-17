@@ -7,6 +7,7 @@ It contains:
 - a versioned JSON schema;
 - typed parameters and defaults;
 - browser and desktop steps;
+- reusable window focus, resize, minimize, maximize, and restore steps;
 - semantic target contracts;
 - optional post-action verification.
 
@@ -65,6 +66,41 @@ Programs are stored in `~/.nexcore/programs` by default. Override this with
 
 Program names match `^[a-z0-9][a-z0-9._-]{1,80}$`. Programs contain 1-20
 sequential steps and are limited to 256 KiB.
+
+## Window-management steps
+
+Window actions use the same operation contract as other desktop actions:
+
+```json
+[
+  {
+    "act": {
+      "surface": "desktop",
+      "action": "window_focus",
+      "windowId": "w-42"
+    }
+  },
+  {
+    "act": {
+      "surface": "desktop",
+      "action": "window_resize",
+      "width": 1280,
+      "height": 800
+    }
+  },
+  {
+    "act": {
+      "surface": "desktop",
+      "action": "window_minimize"
+    }
+  }
+]
+```
+
+Supported window actions are `window_focus`, `window_resize`, `window_move`,
+`window_minimize`, `window_maximize`, and `window_restore`. They remain
+policy-checked and cannot smuggle coordinates or headed-mode overrides into a
+program.
 
 ## Parameters
 
@@ -149,7 +185,10 @@ Screenshots and coordinates are never automatic program fallbacks.
 }
 ```
 
-Browser supports `value` and `url`. Desktop initially supports `value`.
+Browser supports `value`, `text`, `exists`, and `url`. Desktop supports
+`value`, `text`, and `exists`. Pixel-only surfaces can use
+`visual_changed`, which proves that the captured region changed rather than
+claiming that a business-level action succeeded.
 
 An action that may already have been delivered is not replayed automatically
 when verification fails. Read the failure, repair the program or UI, then run

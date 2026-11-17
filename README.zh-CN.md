@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./assets/hero-v040.svg" alt="NexcoreCtrlComputer 0.5.0 桌面与浏览器控制流程" width="100%">
+  <img src="./assets/hero-v060.svg" alt="NexcoreCtrlComputer 0.6 桌面与浏览器控制平面" width="100%">
 </p>
 
 <h1 align="center">NexcoreCtrlComputer</h1>
@@ -16,8 +16,23 @@ JS/CLI/MCP 契约控制桌面和浏览器，在本地完成无障碍目标定位
 并返回紧凑回执，而不是把截图和完整控件树反复发给模型。
 
 它既可以执行一次语义动作，也可以保存参数化 UI 程序。底层使用
-**agent-desktop**、**agent-browser** 和显式开启的 PyAutoGUI 兜底；它不是
-一个独立的桌面软件。
+**agent-desktop**、**Windows-MCP**、**agent-browser** 和显式开启的 PyAutoGUI
+兜底；它不是一个独立的桌面软件。
+
+## 0.6.0 增加了什么
+
+`0.6.0` 将公开仓库同步到 NexcoreWork 2.5.9 实际使用的电脑控制内核，并把
+软件启动和长任务能力写进正式架构：
+
+- 已安装软件按准确的可执行文件路径或 `shell:AppsFolder` AUMID 启动；
+  只有目录身份不可用时才回退到 Windows-MCP，不再猜进程名。
+- `window_focus`、`window_resize`、`window_minimize`、`window_maximize`、
+  `window_restore` 可以作为语义程序步骤复用。
+- 包内正式提供 TypeScript 声明，覆盖 computer、policy、program、observation、
+  action 和 verification 接口。
+- 架构文档从旧的“后端堆叠图”升级为一条完整控制平面：有界观察、目标解析、
+  执行路由、后置验证和证据回执。
+- README 主图与架构图全部替换为 0.6 版本。
 
 ## 0.5.1 增加了什么
 
@@ -139,11 +154,20 @@ nexcore program run browser.fill '{"value":"Ada"}'
 
 ## 架构
 
-![NexcoreCtrlComputer 桌面与浏览器控制架构](./assets/architecture-v033.svg)
+![NexcoreCtrlComputer 0.6 控制平面架构](./assets/architecture-v060.svg)
 
-通道路由显式区分桌面和浏览器；本地运行时负责有界观察、逐级目标定位、安全策略、
-动作执行和状态证明。之前的浏览器会话不会偷偷接管后续的
-`observe({ view: "windows" })`。
+架构按五层契约拆分：
+
+| 层级 | 职责 | 失败边界 |
+|---|---|---|
+| 客户端 | Agent、MCP、JS、CLI 或语义程序表达意图 | 后端细节不泄漏给模型 |
+| 控制平面 | 规范化、会话策略、观察、解析、路由、验证与回执 | 操作契约和策略校验 |
+| 目标定位 | 无障碍快照、软件目录、浏览器状态、视觉帧 | 过期 ref、窗口和帧直接拒绝 |
+| 执行 | 桌面/浏览器语义动作、窗口、剪贴板、输入与受控兜底 | 无法证明结果时不做危险重放 |
+| 证据 | 值、文本、URL、存在性或 `visual_changed` | 未知保持未知，不伪装成功 |
+
+桌面和浏览器状态始终显式区分；之前的浏览器会话不会偷偷接管后续的
+`observe({ view: "windows" })`。截图不会因为“能截”就升级成默认路径。
 
 ## 该用哪个观察接口？
 
@@ -151,9 +175,12 @@ nexcore program run browser.fill '{"value":"Ada"}'
 |---|---|
 | 查找已打开的桌面窗口 | `observe({ view: "windows" })` |
 | 列出正在运行的桌面应用 | `observe({ view: "apps" })` |
+| 列出已安装且可启动的软件与 AUMID | `observe({ view: "software" })` |
 | 查看计算器控件 | `observe({ app: "CalculatorApp.exe", query: "7" })` |
 | 继续操作当前网页 | `observe({ surface: "browser" })` |
 | 打开网页并观察 | `observe({ surface: "browser", url: "https://..." })` |
+| 查看当前可用控制引擎 | `observe({ view: "adapters" })` |
+| 没有可靠无障碍树时定位控件 | `observe({ view: "visual" })` |
 
 ## 三步跑起来
 
@@ -209,7 +236,9 @@ nexcore act '{
 
 支持 `status`、`observe`、`act`、`run`、`program_save`、`program_list`、
 `program_run`、`close`。动作涵盖点击、输入、按键、选择、勾选、展开、滚动、
-窗口管理和剪贴板读写。桌面 `observe` 可直接查看 windows、apps、displays、
+窗口管理和剪贴板读写。软件清单会返回准确的 `launch` 描述，`appId` 可直接打开
+AUMID 或可执行文件；语义程序可包含窗口焦点、缩放、最小化、最大化和恢复动作，
+但仍拒绝一次性 ref、像素坐标和 headed 模式。桌面 `observe` 可直接查看 windows、apps、displays、
 notifications、surfaces；这些视图会明确回到桌面通道，不会被之前的浏览器会话
 劫持。截图和坐标点击只能作为显式的一次性动作，不能写进可复用程序。
 

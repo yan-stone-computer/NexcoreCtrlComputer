@@ -1,83 +1,147 @@
 # Architecture
 
-![NexcoreCtrlComputer semantic program architecture](../assets/architecture.svg)
+![NexcoreCtrlComputer 0.6 control-plane architecture](../assets/architecture-v060.svg)
+
+## The question this architecture answers
+
+How can an agent operate a computer without turning every task into a sequence
+of screenshots, coordinates, and retries?
+
+NexcoreCtrlComputer answers with one session-scoped control plane. Clients
+express an intent; the runtime obtains only the state needed to resolve that
+intent, chooses the least physical available route, executes once, verifies the
+postcondition, and returns a compact evidence receipt.
 
 ```text
-agent / MCP / JS / CLI
-          |
-      one tool
-          |
-   semantic program runtime
-     | compile + parameters
-     | atomic program store
-     | adaptive target resolver
-  policy -> compact -> verify
-          |
-  +-------+--------+
-  |                |
-desktop          browser
-agent-desktop    agent-browser
-  |                |
-UIA / AX / AT-SPI  CDP
-          |
-   opt-in PyAutoGUI
-   coordinate fallback
+agent / MCP / JS / CLI / saved program
+                     |
+              operation contract
+                     |
+       +-------------+-------------+
+       |       control plane       |
+       | normalize -> policy       |
+       | observe -> resolve        |
+       | route -> act -> verify    |
+       | receipt -> next decision  |
+       +-------------+-------------+
+                     |
+        +------------+------------+
+        |                         |
+     desktop                   browser
+  accessibility             CDP + semantic
+  software catalog          page snapshot
+  window state              selector target
+        |                         |
+        +------------+------------+
+                     |
+             guarded visual/input
+                  fallback
 ```
 
-## Decisions
+## Five contracts
 
-1. Accessibility data is the primary observation because it is semantic,
-   deterministic, and much smaller than screenshots.
-2. Refs are short-lived handles. A stale ref must fail instead of clicking a
-   lookalike.
-3. The model sees compact text, not raw backend JSON. Structured data remains
-   inside the local process for target resolution and verification.
-4. Actions return a small disposition. Expensive verification is explicit via
-   `expect`, so routine actions do not pay for an unnecessary round trip.
-5. One MCP tool is exposed. The tool's mode and action fields carry the small
-   amount of polymorphism required for desktop, browser, and batch execution.
-6. Coordinate automation is an exception path, not the default. It is gated by
-   policy and protected by PyAutoGUI's corner fail-safe.
-7. Reusable automation is stored as semantic program JSON. The source contains
-   role/name/context targets and state contracts, never snapshot refs,
-   coordinates, or screenshot bytes.
-8. Program replay starts with exact accessibility find for desktop targets,
-   scopes through a named ancestor when context is required, then falls back to
-   bounded snapshots. Visual fallback is never automatic.
+### 1. Client contract
 
-## Visual-frame fallback
+JavaScript, CLI, and MCP use the same operation surface. Saved programs add
+typed parameters and replayable intent, but do not create a second automation
+language for the model.
 
-Visual control is an explicit fallback for surfaces that expose no useful
-accessibility tree. `observe({ view: "visual" })` captures one display PNG, or a
-single selected window when `windowId`/`windowTitle` is supplied, and records a
-short-lived frame contract:
+The public modes are `status`, `observe`, `act`, `run`, `program_save`,
+`program_list`, `program_run`, and `close`.
+
+### 2. Control-plane contract
+
+Every request is normalized into a bounded operation containing:
+
+- surface, view, action, target, text/value, and optional expectation;
+- session identity and policy;
+- a compact result budget;
+- a retry disposition supplied by the chosen backend.
+
+Natural aliases such as `minimize`, `maximize`, and `restore` normalize before
+routing. They are not separate tool names exposed to the model.
+
+### 3. Grounding contract
+
+The target resolver follows an ordered ladder:
+
+1. exact accessibility role/name resolution;
+2. named-context scoping when identical names exist in multiple regions;
+3. a compact accessibility snapshot with short-lived refs;
+4. browser CSS or semantic selectors;
+5. a visual candidate/cell/zoom contract only when structure is insufficient.
+
+Installed software is a separate observation from running applications.
+Software inventory returns the exact executable path or AUMID needed to launch
+the intended application. The runtime no longer guesses a process name when a
+catalog identity is available.
+
+### 4. Execution contract
+
+Desktop semantic actions are handled by `agent-desktop`, with `Windows-MCP` as
+the explicit Windows fallback for catalog launch, window inventory, clipboard,
+and supported input.
+
+Browser work stays inside `agent-browser` and CDP. A page session cannot capture
+a later desktop inventory request.
+
+Visual pointer actions and atomic `paste` use PyAutoGUI only when headed and
+coordinate modes are enabled. A visual frame records:
 
 - SHA-256 frame identity and expiry;
-- display identity plus capture kind and window identity when scoped;
-- capture bounds used as the coordinate origin;
-- physical image dimensions, display bounds, and display scale;
-- a labeled normalized grid whose cells map safely to physical coordinates.
+- capture kind, display identity, and optional window identity;
+- capture bounds, physical image size, display bounds, and scale;
+- a labeled grid and accessible candidate rectangles.
 
-Accessible controls with bounds are projected into the same frame as numbered
-candidate marks. The preview combines the grid and marks, while the model may
-select a candidate id, a grid cell, or a normalized point. Dense regions can be
-cropped into a second image with a `zoomId`; zoom coordinates map back through
-the parent frame before physical input.
+Before input, the runtime rejects unknown or expired frames, disappeared windows,
+changed window bounds, and stale accessibility refs. A point maps through the
+captured bounds, not through a mixture of CSS, image, and physical pixels.
 
-Pointer actions accept `{ frameId, cell }` or `{ frameId, normalized }`. Before
-input, the runtime rejects unknown/expired frames, closed windows, and windows
-that moved or resized after capture. It maps through capture bounds to physical
-screen coordinates and returns the mapping in the control receipt. Atomic
-`paste` reuses this path, then sends one clipboard-backed chord.
+### 5. Verification and evidence contract
 
-When semantic postconditions are unavailable, `visual_changed` compares the
-frame hash after the action. This proves that pixels changed, not that the
-intended business action succeeded; callers should prefer semantic verification
-whenever the app exposes it.
+Important actions can specify `expect`. Supported proof includes value, text,
+existence, URL, and `visual_changed`.
+
+The receipt preserves route, engine, strategy, delivery, retry disposition, and
+verification. A delivered action that cannot be verified remains
+`delivered_unverified`; it is not rewritten as success.
+
+## Semantic programs
+
+Programs store portable intent:
+
+- typed parameters and defaults;
+- role/name/context targets;
+- browser selectors when no semantic target is stable;
+- window-management steps;
+- explicit postconditions.
+
+Programs reject screenshot-qualified refs, pixels, coordinate-only targets, and
+headed mode. Replay re-grounds every target against the current UI instead of
+reusing state from an earlier run.
+
+## Failure boundaries
+
+- Stale refs and frames fail closed.
+- A changed active window invalidates visual input.
+- Unsafe delivery is not retried automatically.
+- Backend output is treated as untrusted data.
+- Headed and coordinate input are opt-in.
+- App and domain allowlists apply before action execution.
+- PyAutoGUI keeps its corner fail-safe.
 
 ## Backend ownership
 
-NexcoreCtrlComputer owns orchestration, compaction, policy, verification, and
-protocol adapters. Platform accessibility and CDP behavior remain owned by the
-upstream backends. This keeps the framework small and lets fixes flow from the
-specialist projects.
+NexcoreCtrlComputer owns orchestration, bounded context, target resolution,
+policy, verification, program replay, and protocol adapters.
+
+Platform behavior remains owned by upstream projects:
+
+- `agent-desktop`: native accessibility snapshots and semantic actions;
+- `Windows-MCP`: Windows inventory, launch, window, clipboard, and fallback
+  interaction semantics;
+- `agent-browser`: CDP browser automation;
+- `PyAutoGUI`: guarded physical input where semantic APIs cannot operate.
+
+This boundary keeps the project reviewable and avoids silently forking specialist
+platform engines.

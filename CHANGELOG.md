@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.0 - 2026-11-17
+
+- Synchronized the public runtime with the NexcoreWork 2.5.9 computer-control kernel.
+- Added explicit installed-software launch strategies for executable paths, `shell:AppsFolder` AUMIDs, and Windows-MCP fallback instead of guessing a desktop process name.
+- Added window focus, resize, minimize, maximize, and restore actions to reusable semantic programs.
+- Published TypeScript declarations for `createComputer`, policy, observation, action, program, and verification APIs.
+- Replaced the legacy architecture figure with a control-plane diagram covering observation, target resolution, execution routing, verification, receipts, backends, and failure boundaries.
+- Expanded the English and Chinese README with the 0.6 execution model, software launch path, program capabilities, and current verification status.
+
 ## 0.5.1 - 2026-11-17
 
 - Added window-scoped visual frames with capture-bound coordinate mapping and stale-window bounds checks.

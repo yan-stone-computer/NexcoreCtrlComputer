@@ -876,6 +876,13 @@ export class Computer {
         ...item,
         launchName: item.name,
         launchAdapter: "windows-mcp",
+        launch: {
+          adapter: /^[A-Za-z]:[\\/]/.test(item.appId || "")
+            ? "catalog-executable"
+            : item.appId ? "apps-folder" : "windows-mcp",
+          app: item.name,
+          ...(item.appId ? { appId: item.appId } : {})
+        },
         controlAdapters: browser
           ? ["agent-desktop", "windows-mcp", "agent-browser", "playwright-mcp"]
           : ["agent-desktop", "windows-mcp"]
@@ -907,6 +914,51 @@ export class Computer {
         verified: true,
         revision: remembered.revision
       })
+    };
+  }
+
+  async _launchSoftware(input) {
+    const name = String(input.app || input.name || "").trim();
+    const appId = String(input.appId || input.app_id || "").trim().replace(/↗$/u, "");
+    if (appId) {
+      if (/^[A-Za-z]:[\\/]/.test(appId) && existsSync(appId)) {
+        const text = await this.windowsMcp.launch(name || appId, appId);
+        return {
+          data: {
+            success: true,
+            text,
+            appId,
+            disposition: { delivery: "delivered_unverified", retry: "unsafe" }
+          },
+          elapsedMs: 0,
+          engine: "windows-mcp",
+          strategy: "catalog-executable"
+        };
+      }
+      const target = appId.startsWith("shell:") ? appId : `shell:AppsFolder\\${appId}`;
+      const result = await runProcess("explorer.exe", [target], { timeoutMs: 2000 });
+      return {
+        data: {
+          success: true,
+          text: result.stderr.trim() || `Opened ${target}`,
+          appId,
+          disposition: { delivery: "delivered_unverified", retry: "unsafe" }
+        },
+        elapsedMs: 0,
+        engine: "windows-shell",
+        strategy: "apps-folder"
+      };
+    }
+    const text = await this.windowsMcp.launch(name || input.app, input.app);
+    return {
+      data: {
+        success: true,
+        text,
+        disposition: { delivery: "delivered_unverified", retry: "unsafe" }
+      },
+      elapsedMs: 0,
+      engine: "windows-mcp",
+      strategy: "catalog-name"
     };
   }
 
@@ -2156,25 +2208,25 @@ export class Computer {
       const launchTimeout = Number.isFinite(requestedTimeout) && requestedTimeout > 0 ? requestedTimeout : 10000;
       let response;
       let launchEngine = "windows";
-      try {
-        response = await this._desktop([
-          "launch",
-          input.app,
-          "--timeout",
-          String(Math.min(launchTimeout, this.config.timeoutMs))
-        ], { headed: input.headed });
-      } catch (error) {
-        if (!canUseWindowsMcpFallback(error)) throw error;
-        const text = await this.windowsMcp.launch(input.app, input.app);
-        launchEngine = "windows-mcp";
-        response = {
-          data: {
-            success: true,
-            text,
-            disposition: { delivery: "delivered_unverified", retry: "unsafe" }
-          },
-          elapsedMs: 0
-        };
+      let launchStrategy = "process-launch";
+      if (input.appId || input.app_id) {
+        response = await this._launchSoftware(input);
+        launchEngine = response.engine;
+        launchStrategy = response.strategy;
+      } else {
+        try {
+          response = await this._desktop([
+            "launch",
+            input.app,
+            "--timeout",
+            String(Math.min(launchTimeout, this.config.timeoutMs))
+          ], { headed: input.headed });
+        } catch (error) {
+          if (!canUseWindowsMcpFallback(error)) throw error;
+          response = await this._launchSoftware(input);
+          launchEngine = response.engine;
+          launchStrategy = response.strategy;
+        }
       }
       return {
         ...actionResult("desktop", action, response.data, { elapsedMs: response.elapsedMs }),
@@ -2183,7 +2235,7 @@ export class Computer {
         receipt: controlReceipt("act", {
           surface: "desktop",
           engine: launchEngine,
-          strategy: launchEngine === "windows-mcp" ? "app-launch-fallback" : "process-launch",
+          strategy: launchStrategy,
           delivery: "delivered_unverified",
           retry: "unsafe"
         })

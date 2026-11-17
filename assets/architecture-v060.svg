@@ -1,0 +1,167 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="980" viewBox="0 0 1600 980" role="img" aria-labelledby="title desc">
+  <title id="title">NexcoreCtrlComputer 0.6 architecture</title>
+  <desc id="desc">Clients enter one control plane with session policy, semantic program runtime, bounded observation, target resolution, action routing, verification and receipt evidence. Desktop uses agent-desktop and Windows-MCP; browser uses agent-browser; guarded visual input is the final fallback.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 10 5 0 10Z" fill="#0b8797"/>
+    </marker>
+    <marker id="arrow-light" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 10 5 0 10Z" fill="#65d4df"/>
+    </marker>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#20b9c8"/>
+      <stop offset="1" stop-color="#73c96b"/>
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="980" rx="34" fill="#f7fbfc"/>
+  <g font-family="Segoe UI, Microsoft YaHei, sans-serif">
+    <circle cx="68" cy="66" r="18" fill="url(#accent)"/>
+    <text x="98" y="75" font-size="27" font-weight="750" fill="#102a33">NexcoreCtrlComputer</text>
+    <text x="98" y="101" font-size="13" fill="#5a747d">CONTROL PLANE ARCHITECTURE · v0.6.0</text>
+    <text x="1530" y="76" text-anchor="end" font-size="13" fill="#5a747d">accessibility first · local evidence · explicit fallbacks</text>
+
+    <g>
+      <rect x="42" y="136" width="270" height="592" rx="24" fill="#ffffff" stroke="#c9e0e5" stroke-width="1.5"/>
+      <text x="68" y="174" font-size="13" font-weight="700" fill="#0b7f95" letter-spacing="1.2">CLIENTS</text>
+      <text x="68" y="204" font-size="18" font-weight="700" fill="#17343d">One intent</text>
+      <g font-size="13" fill="#264852">
+        <rect x="66" y="232" width="222" height="58" rx="14" fill="#f4fafb" stroke="#d4e7eb"/>
+        <text x="82" y="256" font-weight="700">Agent orchestrator</text>
+        <text x="82" y="277">task · tool call · repair loop</text>
+        <rect x="66" y="306" width="222" height="58" rx="14" fill="#f4fafb" stroke="#d4e7eb"/>
+        <text x="82" y="330" font-weight="700">MCP / JSON-RPC</text>
+        <text x="82" y="351">one computer tool</text>
+        <rect x="66" y="380" width="222" height="58" rx="14" fill="#f4fafb" stroke="#d4e7eb"/>
+        <text x="82" y="404" font-weight="700">JavaScript SDK</text>
+        <text x="82" y="425">createComputer API</text>
+        <rect x="66" y="454" width="222" height="58" rx="14" fill="#f4fafb" stroke="#d4e7eb"/>
+        <text x="82" y="478" font-weight="700">CLI</text>
+        <text x="82" y="499">JSON operations</text>
+        <rect x="66" y="528" width="222" height="58" rx="14" fill="#e8faf7" stroke="#9fe0d2"/>
+        <text x="82" y="552" font-weight="700">Semantic programs</text>
+        <text x="82" y="573">typed replayed workflow</text>
+      </g>
+      <rect x="66" y="622" width="222" height="76" rx="14" fill="#102a33"/>
+      <text x="82" y="649" font-size="12" font-weight="700" fill="#68d5df">MODEL PAYLOAD</text>
+      <text x="82" y="670" font-size="12" fill="#d7eaee">bounded observations</text>
+      <text x="82" y="688" font-size="12" fill="#d7eaee">compact receipts</text>
+    </g>
+
+    <g>
+      <rect x="344" y="112" width="886" height="706" rx="28" fill="#0b2029"/>
+      <text x="374" y="152" font-size="13" font-weight="700" fill="#66d5e0" letter-spacing="1.2">CONTROL PLANE</text>
+      <text x="374" y="181" font-size="20" font-weight="700" fill="#f2fafb">Session-scoped policy, routing and proof</text>
+
+      <g font-size="12">
+        <rect x="374" y="210" width="398" height="86" rx="16" fill="#12313c" stroke="#28515d"/>
+        <text x="394" y="236" font-weight="700" fill="#72d8e2">REQUEST NORMALIZER</text>
+        <text x="394" y="260" fill="#e0f0f3">surface · action · target · expect · parameters</text>
+        <text x="394" y="281" fill="#9ec1c8">natural aliases compile into one operation contract</text>
+        <rect x="788" y="210" width="412" height="86" rx="16" fill="#12313c" stroke="#28515d"/>
+        <text x="808" y="236" font-weight="700" fill="#72d8e2">SESSION POLICY</text>
+        <text x="808" y="260" fill="#e0f0f3">app/domain allowlists · headed gate · coordinate gate</text>
+        <text x="808" y="281" fill="#9ec1c8">stale refs, windows and frames fail closed</text>
+      </g>
+
+      <g>
+        <rect x="374" y="326" width="180" height="130" rx="17" fill="#ffffff"/>
+        <text x="394" y="354" font-size="11" font-weight="700" fill="#0b8299" letter-spacing="1">01 OBSERVE</text>
+        <text x="394" y="382" font-size="17" font-weight="700" fill="#17343d">Bounded state</text>
+        <text x="394" y="407" font-size="12" fill="#58737d">accessibility snapshots</text>
+        <text x="394" y="428" font-size="12" fill="#58737d">windows · apps · catalog</text>
+        <text x="394" y="449" font-size="12" fill="#58737d">frame candidates · zoom</text>
+        <rect x="584" y="326" width="180" height="130" rx="17" fill="#ffffff"/>
+        <text x="604" y="354" font-size="11" font-weight="700" fill="#0b8299" letter-spacing="1">02 RESOLVE</text>
+        <text x="604" y="382" font-size="17" font-weight="700" fill="#17343d">Target ladder</text>
+        <text x="604" y="407" font-size="12" fill="#58737d">exact role/name find</text>
+        <text x="604" y="428" font-size="12" fill="#58737d">named-context scope</text>
+        <text x="604" y="449" font-size="12" fill="#58737d">selector / compact tree</text>
+        <rect x="794" y="326" width="180" height="130" rx="17" fill="#ffffff"/>
+        <text x="814" y="354" font-size="11" font-weight="700" fill="#0b8299" letter-spacing="1">03 ACT</text>
+        <text x="814" y="382" font-size="17" font-weight="700" fill="#17343d">Route action</text>
+        <text x="814" y="407" font-size="12" fill="#58737d">semantic desktop/browser</text>
+        <text x="814" y="428" font-size="12" fill="#58737d">window · clipboard · input</text>
+        <text x="814" y="449" font-size="12" fill="#58737d">atomic paste · one chord</text>
+        <rect x="1004" y="326" width="196" height="130" rx="17" fill="#d9f6f1"/>
+        <text x="1024" y="354" font-size="11" font-weight="700" fill="#087973" letter-spacing="1">04 VERIFY</text>
+        <text x="1024" y="382" font-size="17" font-weight="700" fill="#10353b">State proof</text>
+        <text x="1024" y="407" font-size="12" fill="#3e6e6c">value · text · URL · exists</text>
+        <text x="1024" y="428" font-size="12" fill="#3e6e6c">visual_changed</text>
+        <text x="1024" y="449" font-size="12" fill="#3e6e6c">delivered_verified</text>
+      </g>
+
+      <g fill="none" stroke="#62d1dc" stroke-width="2.2" marker-end="url(#arrow-light)">
+        <path d="M554 391h26"/>
+        <path d="M764 391h26"/>
+        <path d="M974 391h26"/>
+      </g>
+
+      <g>
+        <rect x="374" y="492" width="278" height="118" rx="17" fill="#12313c" stroke="#28515d"/>
+        <text x="394" y="520" font-size="12" font-weight="700" fill="#72d8e2">VISUAL CONTRACT</text>
+        <text x="394" y="546" font-size="13" fill="#e0f0f3">frameId + capture bounds + window generation</text>
+        <text x="394" y="568" font-size="13" fill="#e0f0f3">grid / candidate / normalized point</text>
+        <text x="394" y="590" font-size="12" fill="#9ec1c8">expiry and stale-window checks before input</text>
+        <rect x="670" y="492" width="250" height="118" rx="17" fill="#12313c" stroke="#28515d"/>
+        <text x="690" y="520" font-size="12" font-weight="700" fill="#72d8e2">PROGRAM RUNTIME</text>
+        <text x="690" y="546" font-size="13" fill="#e0f0f3">typed parameters · interpolation</text>
+        <text x="690" y="568" font-size="13" fill="#e0f0f3">no refs / pixels / headed mode</text>
+        <text x="690" y="590" font-size="12" fill="#9ec1c8">window and cross-surface steps</text>
+        <rect x="938" y="492" width="262" height="118" rx="17" fill="#12313c" stroke="#28515d"/>
+        <text x="958" y="520" font-size="12" font-weight="700" fill="#72d8e2">EVIDENCE RECEIPT</text>
+        <text x="958" y="546" font-size="13" fill="#e0f0f3">route · engine · strategy · delivery</text>
+        <text x="958" y="568" font-size="13" fill="#e0f0f3">retry disposition · verification</text>
+        <text x="958" y="590" font-size="12" fill="#9ec1c8">unknown state stays unknown</text>
+      </g>
+
+      <rect x="374" y="638" width="826" height="146" rx="18" fill="#102a33" stroke="#28515d"/>
+      <text x="396" y="668" font-size="12" font-weight="700" fill="#72d8e2" letter-spacing="1">SURFACES</text>
+      <rect x="396" y="684" width="382" height="76" rx="14" fill="#173a45"/>
+      <text x="418" y="711" font-size="15" font-weight="700" fill="#eef8fa">Desktop</text>
+      <text x="418" y="734" font-size="12" fill="#a9c9cf">catalog → AUMID/executable launch → accessibility tree</text>
+      <rect x="798" y="684" width="380" height="76" rx="14" fill="#173a45"/>
+      <text x="820" y="711" font-size="15" font-weight="700" fill="#eef8fa">Browser</text>
+      <text x="820" y="734" font-size="12" fill="#a9c9cf">CDP session → page/accessibility snapshot → navigation proof</text>
+    </g>
+
+    <g>
+      <rect x="1260" y="136" width="298" height="592" rx="24" fill="#ffffff" stroke="#c9e0e5" stroke-width="1.5"/>
+      <text x="1288" y="174" font-size="13" font-weight="700" fill="#0b7f95" letter-spacing="1.2">BACKENDS</text>
+      <text x="1288" y="204" font-size="18" font-weight="700" fill="#17343d">Specialist engines</text>
+      <g font-size="13" fill="#264852">
+        <rect x="1288" y="234" width="242" height="88" rx="15" fill="#f4fafb" stroke="#d4e7eb"/>
+        <text x="1306" y="261" font-weight="700">agent-desktop</text>
+        <text x="1306" y="284">UIA / AX / AT-SPI snapshots</text>
+        <text x="1306" y="304">semantic desktop actions</text>
+        <rect x="1288" y="338" width="242" height="88" rx="15" fill="#f4fafb" stroke="#d4e7eb"/>
+        <text x="1306" y="365" font-weight="700">Windows-MCP</text>
+        <text x="1306" y="388">catalog launch · window inventory</text>
+        <text x="1306" y="408">clipboard · fallback input</text>
+        <rect x="1288" y="442" width="242" height="88" rx="15" fill="#f4fafb" stroke="#d4e7eb"/>
+        <text x="1306" y="469" font-weight="700">agent-browser</text>
+        <text x="1306" y="492">CDP sessions</text>
+        <text x="1306" y="512">semantic browser actions</text>
+        <rect x="1288" y="546" width="242" height="88" rx="15" fill="#fff8ec" stroke="#efcf91"/>
+        <text x="1306" y="573" font-weight="700">PyAutoGUI</text>
+        <text x="1306" y="596">opt-in visual pointer fallback</text>
+        <text x="1306" y="616">fail-safe remains enabled</text>
+      </g>
+      <text x="1288" y="674" font-size="12" fill="#607c85">Upstream engines remain independently</text>
+      <text x="1288" y="694" font-size="12" fill="#607c85">versioned and licensed.</text>
+    </g>
+
+    <g fill="none" stroke="#0b8797" stroke-width="2.5" marker-end="url(#arrow)">
+      <path d="M312 430h32"/>
+      <path d="M1230 430h30"/>
+      <path d="M312 652h32"/>
+      <path d="M1230 652h30"/>
+    </g>
+
+    <g transform="translate(344 842)">
+      <rect width="1214" height="96" rx="20" fill="#ffffff" stroke="#c9e0e5"/>
+      <text x="28" y="30" font-size="12" font-weight="700" fill="#0b7f95" letter-spacing="1.1">DESIGN RULE</text>
+      <text x="28" y="57" font-size="16" font-weight="700" fill="#17343d">Use the smallest state that can identify the target, the safest action that can deliver it, and the strongest evidence available to prove the result.</text>
+      <text x="28" y="78" font-size="12" fill="#5c7680">Screenshots and coordinates are never the default. They are explicit, bounded fallbacks with expiry, window identity and post-action proof.</text>
+    </g>
+  </g>
+</svg>
